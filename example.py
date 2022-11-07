@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Tuple
 import drjit as dr
 from drjit.cuda.ad import (Int, Float, 
@@ -6,33 +7,10 @@ from drjit.cuda.ad import (Int, Float,
 
 import matplotlib.pyplot as plt
 
+from types import AABox, Segment, Tubelet
+
 dr.set_log_level(dr.LogLevel.Info)
 
-@dataclass
-class Segment:
-  a: Array3f
-  b: Array3f
-
-
-@dataclass 
-class Tubelet:
-  seg: Segment
-  r1: Float
-  r2: Float
-  
-@dataclass 
-class AABox:
-  min: Array3f
-  max: Array3f
-
-
-@dataclass 
-class VoxelGrid:
-  bounds : AABox
-  dim : Array3i
-
-  entries: Int
-  counts: Int 
 
 
 def distance_segment(p:Array3f, seg:Segment, 
@@ -50,6 +28,21 @@ def distance_segment(p:Array3f, seg:Segment,
 
   dist_sq = dr.select(l2 >= eps, dist_sq, dr.dot(pb, pb))
   return t, dist_sq
+
+
+
+def lines_box(bounds:AABox, seg:Segment) -> Tuple[float, float]:
+
+  a_start = (bounds.min - seg.a) / seg.dir
+  a_end = (bounds.max - seg.a) / seg.dir 
+
+  b_start = (seg.b - bounds.min) / seg.dir
+  b_end = (seg.b - bounds.max) / seg.dir 
+
+  return  (dr.minimum(a_start, a_end).max(dim=2).values,  
+     1 - dr.minimum(b_start, b_end).max(dim=2).values)
+
+
 
 
 def sdf_tubelet(p:Array3f, tubelet:Tubelet) -> Float:
