@@ -1,8 +1,6 @@
-from dataclasses import dataclass
-from typing import Tuple
+
 import drjit as dr
-from drjit.cuda.ad import (Int, Float, 
-  UInt32, Array3f, Array3i, TensorXf, Loop)
+from drjit.cuda.ad import Float, Loop, UInt32
 
 
 def uneven_sum():

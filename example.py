@@ -1,69 +1,20 @@
-from dataclasses import dataclass
-from functools import cached_property
 from typing import Tuple
+
 import drjit as dr
-from drjit.cuda.ad import (Int, Float, 
-  UInt32, Array3f, Array3i, TensorXf, Loop)
-
 import matplotlib.pyplot as plt
+from drjit.cuda.ad import Array3f, Float, Loop, TensorXf, UInt32
 
-from types import AABox, Segment, Tubelet
+from geometry_types import AABox, Segment, Tubelet
+from segment import point_segment_dist
 
 dr.set_log_level(dr.LogLevel.Info)
 
 
 
-def distance_segment(p:Array3f, seg:Segment, 
-  eps:Float=1e-6) -> Tuple[Float, Float]:
-
-  d = seg.b - seg.a
-  l2 = dr.dot(d, d)  # |b - a|^2
-
-  t = dr.clamp(dr.dot(d, (p - seg.a) / l2), 0., 1.)
-  p_proj = seg.a + t * d
-  delta_p = p_proj - p
-
-  dist_sq = dr.dot(delta_p, delta_p)
-  pb = p - seg.b
-
-  dist_sq = dr.select(l2 >= eps, dist_sq, dr.dot(pb, pb))
-  return t, dist_sq
-
-
-
-def lines_box(bounds:AABox, seg:Segment) -> Tuple[float, float]:
-
-  a_start = (bounds.min - seg.a) / seg.dir
-  a_end = (bounds.max - seg.a) / seg.dir 
-
-  b_start = (seg.b - bounds.min) / seg.dir
-  b_end = (seg.b - bounds.max) / seg.dir 
-
-  return  (dr.minimum(a_start, a_end).max(dim=2).values,  
-     1 - dr.minimum(b_start, b_end).max(dim=2).values)
-
-
-
-
 def sdf_tubelet(p:Array3f, tubelet:Tubelet) -> Float:
-  t, dist_sq = distance_segment(p, tubelet.seg)
+  t, dist_sq = point_segment_dist(p, tubelet.seg)
   r = dr.lerp(tubelet.r1, tubelet.r2, t)
   return dr.sqrt(dist_sq) - r  
-
-
-def distance_segment_box(box:AABox, seg:Segment):
-  dir = seg.b - seg.a
-
-  a_start = (box.min - seg.a) / dir
-  a_end = (box.max - seg.a) / dir 
-
-  b_start = (seg.b - box.min) / dir
-  b_end = (seg.b - box.max) / dir 
-
-  return  (dr.minimum(a_start, a_end),  
-    1 - dr.minimum(b_start, b_end))
-
-
 
 
 def sdf(p:Array3f) -> Float:
@@ -124,9 +75,7 @@ img = Array3f(1.0, 0.8, .0) * sh + Array3f(0, .0, .4)
 img[sdf(p) > .1] = 0
 
 
-img_flat = dr.ravel(img)
-
-img_t = TensorXf(img_flat, shape=(1500, 1500, 3))
+img_t = TensorXf(dr.ravel(img), shape=(1500, 1500, 3))
 
 
 plt.imshow(img_t)

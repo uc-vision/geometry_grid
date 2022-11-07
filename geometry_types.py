@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from functools import cached_property
-import drjit as dr
-from drjit.cuda.ad import (Int, Float, 
-  UInt32, Array3f, Array3i, TensorXf, Loop)
 
+import drjit as dr
+from drjit.cuda.ad import Array3f, Float
 
 dr.set_log_level(dr.LogLevel.Info)
 
@@ -25,7 +24,6 @@ class Segment:
   @cached_property
   def length(self):
     return dr.sqrt(self.length_sq)
-
 
 
 @dataclass 
