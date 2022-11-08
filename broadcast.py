@@ -1,10 +1,10 @@
 
 import drjit as dr
 import numpy as np
-from drjit.cuda.ad import Array3f, TensorXf, Arrayf64
+from drjit.cuda.ad import Array3f, TensorXf
 
 from geometry_types import Segment
-from segment import seg_seg_dist
+from segment import nearest_pairwise_seg
 
 dr.set_log_level(dr.LogLevel.Info)
 
@@ -20,9 +20,14 @@ def random_vectors(n:int, rng=np.random.default_rng()) -> Array3f:
 if __name__ == '__main__':
   dr.set_log_level(dr.LogLevel.Info)
 
-  # x = random_segments(10)
-  # y = random_segments(10)
+  x = random_segments(20)
+  y = random_segments(10)
 
+  dist = nearest_pairwise_seg(x, y)
+  dist2 = nearest_pairwise_seg(y, x)
+
+  print(dist)
+  print(dist2)
 
   # d = seg_seg_dist(x, y)
   # print(d)

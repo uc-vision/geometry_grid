@@ -1,7 +1,8 @@
+from functools import partial
 from typing import Tuple
 
 import drjit as dr
-import matplotlib.pyplot as plt
+import numpy as np
 from drjit.cuda.ad import Array3f, Float, Loop, UInt32
 
 from geometry_types import AABox, Segment, Tubelet
@@ -64,11 +65,26 @@ def seg_seg_dist(seg1:Segment, seg2:Segment) -> Float:
   return dr.sqrt(dr.dot(p1 - p2, p1 - p2))
 
 
-# def distance_matrix(f, x, y):
+def nearest_pairwise_distance(f, x, y) -> Tuple[Float, UInt32]:
 
-#   min_dist = Float(0.0)
-#   i = UInt32(0)
+  min_dist = Float(np.inf)
+  min_index = UInt32(-1)
+  i = UInt32(0)
   
-#   loop = Loop("Distance", lambda: (i, min_dist))
-#   while loop(i < y.width):
+  loop = Loop("Distance", lambda: (i, min_dist, min_index))
+  
+  while loop(i < dr.width(y)):
+    y_i = dr.gather(Segment, y, i)
+    dist = f(x, y_i)
+
+    min_index = dr.select(dist < min_dist, i, min_index)
+    min_dist = dr.minimum(min_dist, dist)
+
+    i += 1
+
+  return min_dist, min_index
+
+
+def nearest_pairwise_seg(x:Segment, y:Segment) -> Tuple[Float, UInt32]:
+  return nearest_pairwise_distance(seg_seg_dist, x, y)
 

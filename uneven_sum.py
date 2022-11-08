@@ -1,6 +1,9 @@
 
 import drjit as dr
-from drjit.cuda.ad import Float, Loop, UInt32
+from drjit.cuda.ad import Float, Loop, UInt32, Array3f, ArrayXi
+
+import numpy as np
+
 
 
 def uneven_sum():
@@ -8,10 +11,8 @@ def uneven_sum():
   offset = Float([0, 3, 11, 13])
   length =  Float([3, 8, 2, 6])
 
-
   sum = Float(0.0)
   i = UInt32(0)
-
 
   loop = Loop("Summation", lambda: (i, sum))
   while loop(i < length):
