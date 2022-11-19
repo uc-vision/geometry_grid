@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import ClassVar, Dict, Optional
+from typing import Generic, TypeVar
 
 import drjit as dr
-from drjit.cuda.ad import Array3f, Float
+from drjit.cuda.ad import Array3f, Float, Int
 
 dr.set_log_level(dr.LogLevel.Info)
 
+T = TypeVar("T")
 
 @dataclass
 class Segment:
@@ -44,6 +45,31 @@ class Tubelet:
   
 @dataclass 
 class AABox:
-  min: Array3f
-  max: Array3f
+  DRJIT_STRUCT  = { 'min':Array3f, 'max' : Array3f }
 
+  min: Array3f = field(default_factory=Array3f)
+  max: Array3f = field(default_factory=Array3f)
+
+
+
+@dataclass 
+class Ragged:
+  DRJIT_STRUCT  = { 'offsets':Int, 'length' : Int }
+
+  offset: Int = field(default_factory=Int)
+  length: Int = field(default_factory=Int)
+
+
+class RaggedArrays(Generic[T]):
+  def __init__(self, data:T, ragged:Ragged):
+    self.data = data
+    self.ragged = ragged
+
+
+
+  def __len__(self):
+    return self.ragged.length
+
+  def __iter__(self):
+    for i in range(len(self)):
+      yield self[i]

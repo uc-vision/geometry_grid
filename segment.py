@@ -1,11 +1,13 @@
 from functools import partial
-from typing import Tuple
+from typing import Callable, Tuple, TypeVar
 
 import drjit as dr
 import numpy as np
 from drjit.cuda.ad import Array3f, Float, Loop, UInt32
 
 from geometry_types import AABox, Segment, Tubelet
+
+T = TypeVar("T")
 
 
 def point_segment_dist(p:Array3f, seg:Segment, 
@@ -65,7 +67,8 @@ def seg_seg_dist(seg1:Segment, seg2:Segment) -> Float:
   return dr.sqrt(dr.dot(p1 - p2, p1 - p2))
 
 
-def nearest_pairwise_distance(f, x, y) -> Tuple[Float, UInt32]:
+def nearest_pairwise_distance(f:Callable[[T, T], Float], 
+  x:T, y:T) -> Tuple[Float, UInt32]:
 
   min_dist = Float(np.inf)
   min_index = UInt32(-1)
@@ -81,10 +84,10 @@ def nearest_pairwise_distance(f, x, y) -> Tuple[Float, UInt32]:
     min_dist = dr.minimum(min_dist, dist)
 
     i += 1
-
   return min_dist, min_index
 
 
 def nearest_pairwise_seg(x:Segment, y:Segment) -> Tuple[Float, UInt32]:
   return nearest_pairwise_distance(seg_seg_dist, x, y)
+
 
