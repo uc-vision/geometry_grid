@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Tuple, TypeVar
+from typing import Callable, List, Tuple, TypeVar
 
 import drjit as dr
 import numpy as np
@@ -27,20 +27,10 @@ def point_segment_dist(p:Array3f, seg:Segment,
   return t, dist_sq
 
 
-def segment_box(box:AABox, seg:Segment):
-  dir = seg.b - seg.a
 
-  a_start = (box.min - seg.a) / dir
-  a_end = (box.max - seg.a) / dir 
+def seg_seg_nearest(seg1:Segment, seg2:Segment, 
+  eps=1e-6) -> Tuple[Float, Float]:
 
-  b_start = (seg.b - box.min) / dir
-  b_end = (seg.b - box.max) / dir 
-
-  return  (dr.minimum(a_start, a_end),  
-    1 - dr.minimum(b_start, b_end))
-
-
-def seg_seg_nearest(seg1:Segment, seg2:Segment, eps=1e-6) -> Tuple[Float, Float]:
   v21 = seg2.a - seg1.a
     
   proj21 = dr.dot(seg2.dir, seg1.dir)
@@ -89,5 +79,54 @@ def nearest_pairwise_distance(f:Callable[[T, T], Float],
 
 def nearest_pairwise_seg(x:Segment, y:Segment) -> Tuple[Float, UInt32]:
   return nearest_pairwise_distance(seg_seg_dist, x, y)
+
+
+
+def segment_box(box:AABox, seg:Segment):
+  dir = seg.b - seg.a
+
+  a_start = (box.min - seg.a) / dir
+  a_end = (box.max - seg.a) / dir 
+
+  b_start = (seg.b - box.min) / dir
+  b_end = (seg.b - box.max) / dir 
+
+  return  (dr.minimum(a_start, a_end),  
+    1 - dr.minimum(b_start, b_end))
+
+
+def expand_box(box:AABox, r:Float):
+  return AABox(box.min - r, box.max + r)
+
+def approx_tube_box(box:AABox, tube:Tubelet):
+  r = dr.maximum(tube.r1, tube.r2) 
+  b = expand_box(box, r)
+
+  return segment_box(b, tube.seg)
+
+def box_edges(box:AABox) -> List[Segment]:
+  
+  l:Array3f = box.min
+  u:Array3f = box.max
+
+  return [Segment(Array3f(a), Array3f(b)) for a, b in [
+    ([l.x, l.y, l.z], [u.x, l.y, l.z]),
+    ([u.x, l.y, l.z], [u.x, u.y, l.z]),
+    ([u.x, u.y, l.z], [l.x, u.y, l.z]),
+    ([l.x, u.y, l.z], [l.x, u.y, l.z]),
+
+    ([l.x, l.y, u.z], [u.x, l.y, u.z]),
+    ([u.x, l.y, u.z], [u.x, u.y, u.z]),
+    ([u.x, u.y, u.z], [l.x, u.y, u.z]),
+    ([l.x, u.y, u.z], [l.x, u.y, u.z]),
+
+    ([l.x, l.y, l.z], [l.x, l.y, u.z]),
+    ([u.x, l.y, l.z], [u.x, l.y, u.z]),
+    ([u.x, u.y, l.z], [u.x, u.y, u.z]),
+    ([l.x, u.y, l.z], [l.x, u.y, u.z])
+  ]]
+
+
+
 
 

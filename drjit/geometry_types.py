@@ -30,6 +30,10 @@ class Segment:
   def length(self):
     return dr.sqrt(self.length_sq)
 
+  def at(self, t:Float):
+    return  dr.lerp(self.a, self.b, t)
+    
+
 
 @dataclass 
 class Tubelet:
@@ -42,6 +46,13 @@ class Tubelet:
   seg: Segment = field(default_factory=Segment)
   r1: Float = field(default_factory=Float)
   r2: Float = field(default_factory=Float)
+
+  def at(self, t:Float):
+    t = dr.clamp(t, 0, 1)
+
+    radius = dr.lerp(self.r1, self.r2, t)
+    p = self.seg.at(t)
+    return p, radius
   
 @dataclass 
 class AABox:
