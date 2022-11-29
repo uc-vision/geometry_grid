@@ -6,15 +6,10 @@ from open3d_vis import render
 import open3d as o3d
 
 from py_structs.numpy import shape
+from ..taichi.skeleton import Skeleton
 
 
-@dataclass 
-class Skeleton: 
-  points: np.ndarray  # float: N, 3 
-  radii: np.ndarray # float: N, 1
-  edges: np.ndarray  # int M, 2
 
-  
 def load_tree(filename:Path, radius_threshold=3.0):
   skeleton =  np.load(filename, allow_pickle=True)
 
@@ -37,7 +32,6 @@ def display_skeleton(skeleton:Skeleton):
   o3d.visualization.draw(skel)
 
 
-  
 
 
 if __name__ == "__main__":
