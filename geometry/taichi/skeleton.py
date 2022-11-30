@@ -30,14 +30,3 @@ class Skeleton:
     return Skeleton(vertices, edges, radii)
 
 
-@ti.data_oriented
-class Grid:
-  def __init__(self, bounds:GridBounds, occupied:ti.field(ti.i32)):
-    self.bounds = bounds
-    self.occupied = occupied
-
-
-  @staticmethod
-  def from_numpy(bounds:np_geom.GridBounds, occupied:np.ndarray):
-    occupied = from_numpy(occupied, dt=ti.i32)
-    return Grid(bounds, occupied)
