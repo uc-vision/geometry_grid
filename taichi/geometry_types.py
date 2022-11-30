@@ -29,7 +29,7 @@ class AABox:
 
 
 @ti.dataclass
-class Grid:
+class GridBounds:
   bounds : AABox
   size: ivec3
 

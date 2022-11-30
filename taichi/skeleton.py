@@ -3,10 +3,9 @@ import taichi as ti
 import numpy as np
 
 from ..numpy import geometry_types as gt
+from .geometry_types import GridBounds
 
 ti.init()
-
-
 
 
 def from_numpy(x:np.ndarray, dt=ti.f32):
@@ -29,3 +28,9 @@ class Skeleton:
     edges = from_numpy(skeleton.edges, dt=ti.i32)
     radii = from_numpy(skeleton.radii)
     return Skeleton(vertices, edges, radii)
+
+
+@ti.data_oriented
+class Grid:
+  def __init__(self, bounds:GridBounds, occupied:ti.field(ti.i32)):
+    )
