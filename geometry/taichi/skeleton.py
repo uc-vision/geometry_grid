@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import taichi as ti
 import numpy as np
 
-from ..numpy import geometry_types as gt
+import geometry.np as np_geom
 
 ti.init()
 
@@ -24,7 +24,7 @@ class Skeleton:
   
 
   @staticmethod
-  def from_numpy(skeleton:gt.Skeleton):
+  def from_numpy(skeleton:np_geom.Skeleton):
     vertices = from_numpy(skeleton.points)
     edges = from_numpy(skeleton.edges, dt=ti.i32)
     radii = from_numpy(skeleton.radii)
