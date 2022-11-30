@@ -2,8 +2,8 @@ from dataclasses import dataclass
 import taichi as ti
 import numpy as np
 
-from ..numpy import geometry_types as gt
 from .geometry_types import GridBounds
+import geometry.np as np_geom
 
 ti.init()
 
@@ -23,7 +23,7 @@ class Skeleton:
   
 
   @staticmethod
-  def from_numpy(skeleton:gt.Skeleton):
+  def from_numpy(skeleton:np_geom.Skeleton):
     vertices = from_numpy(skeleton.points)
     edges = from_numpy(skeleton.edges, dt=ti.i32)
     radii = from_numpy(skeleton.radii)
@@ -33,4 +33,11 @@ class Skeleton:
 @ti.data_oriented
 class Grid:
   def __init__(self, bounds:GridBounds, occupied:ti.field(ti.i32)):
-    )
+    self.bounds = bounds
+    self.occupied = occupied
+
+
+  @staticmethod
+  def from_numpy(bounds:np_geom.GridBounds, occupied:np.ndarray):
+    occupied = from_numpy(occupied, dt=ti.i32)
+    return Grid(bounds, occupied)
