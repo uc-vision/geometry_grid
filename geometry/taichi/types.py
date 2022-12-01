@@ -1,11 +1,9 @@
-from __future__ import annotations
 
 import taichi as ti
-from taichi.math import mat3, vec3, ivec3
+from taichi.math import vec3, ivec3
 import taichi.math as tm
 
 import numpy as np
-
 
 @ti.dataclass
 class Sphere:
@@ -24,8 +22,17 @@ class AABox:
   min: vec3
   max: vec3
 
+  @ti.func
   def expand(self, d:ti.f32):
     return AABox(self.min - d, self.max + d)
+
+  @ti.func
+  def contains(self, p:vec3):
+    for i in ti.static(range(3)):
+      if p[i] < self.min[i] or p[i] > self.max[i]:
+        return False
+        
+    return True
 
 
 @ti.dataclass

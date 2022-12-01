@@ -6,7 +6,7 @@ from open3d_vis import render
 import open3d as o3d
 
 from py_structs.numpy import shape
-from ..taichi.skeleton import Skeleton
+from geometry.np import Skeleton
 
 
 
@@ -42,5 +42,5 @@ if __name__ == "__main__":
 
 
   skeleton = load_tree(args.filename)
-  display_skeleton(skeleton)
+  # display_skeleton(skeleton)
   

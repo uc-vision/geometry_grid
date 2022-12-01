@@ -1,22 +1,22 @@
 from dataclasses import dataclass
+from typing import Any
 import taichi as ti
+
 import numpy as np
 
-from .geometry_types import GridBounds
+from .types import GridBounds
 import geometry.np as np_geom
 
-ti.init()
+from nptyping import NDArray, Shape
+from typeguard import typechecked
 
-
-def from_numpy(x:np.ndarray, dt=ti.f32):
-  v = ti.Vector.field(x.shape[-1], dt=dt)
-  v.from_numpy(x)
-  return v
+from .conversion import from_numpy
 
 
 @ti.data_oriented
 class Skeleton:
-  def __init__(self, vertices, edges, radii):
+  @typechecked
+  def __init__(self, vertices:ti.field, edges:ti.field, radii:ti.field):
     self.vertices = vertices
     self.edges = edges
     self.radii = radii
@@ -24,9 +24,15 @@ class Skeleton:
 
   @staticmethod
   def from_numpy(skeleton:np_geom.Skeleton):
-    vertices = from_numpy(skeleton.points)
-    edges = from_numpy(skeleton.edges, dt=ti.i32)
-    radii = from_numpy(skeleton.radii)
+    vertices = from_numpy(skeleton.points.astype(np.float32))
+    edges = from_numpy(skeleton.edges, dtype=ti.i32)
+    radii = from_numpy(skeleton.radii.astype(np.float32))
+
     return Skeleton(vertices, edges, radii)
+
+  @ti.kernel
+  def _box_intersection(min:ti.types.ndarray(), max:ti.types.ndarray(), counts:ti.types.ndarray()):
+
+
 
 

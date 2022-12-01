@@ -1,7 +1,11 @@
 
 
 from pathlib import Path
-from geometry.np.loading import display_skeleton, load_tree
+
+from geometry import taichi as tg
+from geometry import np as ng
+
+import taichi as ti
 
 
 if __name__ == "__main__":
@@ -10,6 +14,9 @@ if __name__ == "__main__":
   parser.add_argument("filename", type=Path)
   args = parser.parse_args()
 
+  ti.init()
 
-  skeleton = load_tree(args.filename)
-  display_skeleton(skeleton)
+  skeleton = ng.load_tree(args.filename)
+
+  s = tg.Skeleton.from_numpy(skeleton)
+  # display_skeleton(skeleton)
