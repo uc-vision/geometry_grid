@@ -1,1 +1,1 @@
-from . import np, taichi
+from . import torch, taichi

@@ -2,10 +2,21 @@
 
 from pathlib import Path
 
-from geometry import taichi as tg
-from geometry import np as ng
 
 import taichi as ti
+import numpy as np
+import torch
+from geometry.torch.loading import display_skeleton, load_tree
+
+from geometry.taichi.skeleton import BoxIntersection
+from open3d_vis import render
+import open3d as o3d
+
+from geometry.torch.types import voxel_grid
+
+
+ti.init(arch=ti.cuda, debug=True)
+
 
 
 if __name__ == "__main__":
@@ -14,9 +25,17 @@ if __name__ == "__main__":
   parser.add_argument("filename", type=Path)
   args = parser.parse_args()
 
-  ti.init()
+  skeleton = load_tree(args.filename, radius_threshold=10.0)
 
-  skeleton = ng.load_tree(args.filename)
+  bounds = skeleton.bounds
+  boxes = voxel_grid(bounds.lower, bounds.upper, 100.0)
+  # s = BoxIntersection.from_numpy(skeleton, boxes, max_intersections=10)
 
-  s = tg.Skeleton.from_numpy(skeleton)
-  # display_skeleton(skeleton)
+  # s.compute()
+
+  # idx = np.flatnonzero(s.n_box.to_numpy())
+  
+  skel = render.line_set(skeleton.points, skeleton.edges)
+  o3d.visualization.draw(skel)
+  # o3d.visualization.draw([skel, boxes[idx].render()])
+

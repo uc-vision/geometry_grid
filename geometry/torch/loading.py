@@ -6,7 +6,8 @@ from open3d_vis import render
 import open3d as o3d
 
 from py_structs.numpy import shape
-from geometry.np import Skeleton
+import torch
+from .types import Skeleton
 
 
 
@@ -22,10 +23,13 @@ def load_tree(filename:Path, radius_threshold=3.0):
   radii = np.zeros(v.shape) 
   radii[edges[:, 0]] = r
 
-  return Skeleton(v, radii, edges[valid])
+  return Skeleton(
+    torch.from_numpy(v.astype(np.float32)),
+    torch.from_numpy(radii.astype(np.float32)),
+    torch.from_numpy(edges[valid]))
+
 
 def display_skeleton(skeleton:Skeleton):
-
   print(shape(skeleton))
 
   skel = render.line_set(skeleton.points, skeleton.edges)
@@ -42,5 +46,5 @@ if __name__ == "__main__":
 
 
   skeleton = load_tree(args.filename)
-  # display_skeleton(skeleton)
+  display_skeleton(skeleton)
   

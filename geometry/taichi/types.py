@@ -1,9 +1,11 @@
 
+import dataclasses
 import taichi as ti
 from taichi.math import vec3, ivec3
 import taichi.math as tm
 
 import numpy as np
+import geometry.torch as ng
 
 @ti.dataclass
 class Sphere:
@@ -35,10 +37,6 @@ class AABox:
     return True
 
 
-@ti.dataclass
-class GridBounds:
-  bounds : AABox
-  size: ivec3
 
 
 @ti.dataclass
@@ -61,6 +59,7 @@ class Segment:
   def length(self):
     return ti.sqrt(self.length_sq())
 
+  @ti.func
   def point_dist_sq(self, p:vec3, eps=1e-6):
     d = self.dir()
     l2 = tm.dot(d, d)  # |b - a|^2
@@ -75,11 +74,13 @@ class Segment:
     dist_sq = ti.select(l2 >= eps, dist_sq, ti.dot(pb, pb))
     return t, dist_sq
 
+  @ti.func
   def sdf(self, p:vec3):
     t, dist_sq = self.point_dist_sq(p)
     return ti.sqrt(dist_sq)
 
-  def intersects_box(self, box:AABox):
+  @ti.func
+  def box_intersections(self, box:ti.template()):
     dir = self.dir()
 
     a_start = (box.min - self.a) / dir
@@ -88,11 +89,14 @@ class Segment:
     b_start = (self.b - box.min) / dir
     b_end = (self.b - box.max) / dir 
 
-    return  (tm.min(a_start, a_end),  
-      1 - tm.min(b_start, b_end))
+    return  ti.math.vec2(tm.min(a_start, a_end).min(),  
+      1 - tm.min(b_start, b_end).max())
 
 
-
+  @ti.func
+  def intersects_box(self, box:ti.template()):
+    i = self.box_intersections(box)
+    return i[0] <= i[1] and i[0] <= 1 and i[1] >= 0
 
 @ti.dataclass
 class Tubelet:

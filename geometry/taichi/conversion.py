@@ -1,16 +1,10 @@
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import asdict
 import taichi as ti
 
 import numpy as np
-
-from .types import GridBounds
-import geometry.np as np_geom
-
-from nptyping import NDArray, Shape
 from typeguard import typechecked
 
-numpy_taichi = {
+_numpy_taichi = {
     np.float32: ti.f32,
     np.float64: ti.f64,
     np.int32: ti.i32,
@@ -21,16 +15,25 @@ numpy_taichi = {
     np.uint16: ti.u16,
 }
 
+numpy_taichi = {np.dtype(k):v for k,v in _numpy_taichi.items()}
 taichi_numpy = {v:k for k,v in numpy_taichi.items()}
 
 
 @typechecked
-def from_numpy(x:np.ndarray, dtype:ti.DataType=None):
+def from_numpy(x:np.ndarray, dtype=None):
   if dtype is not None:
     x = x.astype(taichi_numpy[dtype])
   else:
+    assert x.dtype in numpy_taichi, f"Unsupported dtype {x.dtype}"
     dtype = numpy_taichi[x.dtype]
 
   v = ti.Vector.field(x.shape[-1], dtype=dtype, shape=x.shape[:-1])
   v.from_numpy(x)
   return v
+
+
+def to_field(data, ti_struct):
+  
+  field = ti_struct.field(shape=data.size)
+  field.from_numpy(asdict(data))
+  return field
