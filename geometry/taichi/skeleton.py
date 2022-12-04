@@ -6,7 +6,7 @@ from geometry.torch import Skeleton, AABox
 from typeguard import typechecked
 
 from geometry.taichi.types import AABox, Segment
-from .conversion import from_numpy, to_field
+from .conversion import from_torch, torch_field
 
 
 @ti.dataclass
@@ -35,11 +35,10 @@ class BoxIntersection:
 
 
 
-  def from_numpy(skeleton:Skeleton, boxes:AABox, max_intersections=10): 
-    print(skeleton.segments.size)   
+  def from_torch(skeleton:Skeleton, boxes:AABox, max_intersections=10): 
     return BoxIntersection(
-      segments=to_field(skeleton.segments, Segment),
-      boxes=to_field(boxes, AABox),
+      segments=torch_field(skeleton.segments, Segment),
+      boxes=torch_field(boxes, AABox),
       max_intersections=max_intersections)
 
 

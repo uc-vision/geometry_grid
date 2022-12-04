@@ -20,17 +20,17 @@ def load_tree(filename:Path, radius_threshold=3.0):
   edges = skeleton['skeleton_edges']
   valid = (r > radius_threshold).reshape(-1)
 
-  radii = np.zeros(v.shape) 
+  radii = np.zeros( (v.shape[0], 1) ) 
   radii[edges[:, 0]] = r
 
+
   return Skeleton(
-    torch.from_numpy(v.astype(np.float32)),
-    torch.from_numpy(radii.astype(np.float32)),
-    torch.from_numpy(edges[valid]))
+    torch.from_numpy(v).to(torch.float32),
+    torch.from_numpy(radii).to(torch.float32),
+    torch.from_numpy(edges[valid]).to(torch.long) )
 
 
 def display_skeleton(skeleton:Skeleton):
-  print(shape(skeleton))
 
   skel = render.line_set(skeleton.points, skeleton.edges)
   o3d.visualization.draw(skel)

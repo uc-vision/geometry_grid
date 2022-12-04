@@ -8,7 +8,7 @@ setup(name='python_geometry',
           'typeguard',
           'py-structs>=1.0.0',
           'taichi',
-          'nptyping',
+          'torchtyping',
 
           # Testing related
           'pytest',

@@ -37,8 +37,6 @@ class AABox:
     return True
 
 
-
-
 @ti.dataclass
 class Segment:
   """A line segment in 3D space."""

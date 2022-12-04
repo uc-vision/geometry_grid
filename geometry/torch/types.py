@@ -5,7 +5,8 @@ from functools import cached_property
 import numpy as np
 
 from open3d_vis import render
-from .dataclass import TensorClass, dataclass, typechecked
+from .dataclass import TensorClass, dataclass
+from typeguard import typechecked
 
 from torchtyping import TensorType
 import torch
@@ -13,8 +14,9 @@ import torch
 @dataclass 
 class Skeleton: 
 
+
   points: TensorType['N', 3, float]  
-  radii: TensorType['N', 3, float]
+  radii: TensorType['N', 1, float]
   edges: TensorType['M', 2, torch.long]  
 
   @property
@@ -23,15 +25,27 @@ class Skeleton:
 
   @cached_property
   def segments(self):
-    return Segments(
+
+    return Segment(
       self.points[self.edges[:, 0]], 
       self.points[self.edges[:, 1]])
+
+  @cached_property
+  def tubes(self):
+    radii = torch.stack([
+        self.radii[self.edges[:, 0]], 
+        self.radii[self.edges[:, 1]]], dim=-1).squeeze(1)
+    
+    
+    return Tube(segments=self.segments, radii=radii)
+
+
 
 @dataclass
 class AABox(TensorClass):
   """An axis aligned bounding box in 3D space."""
-  lower: TensorType[..., 3, float]
-  upper: TensorType[..., 3, float] 
+  lower: TensorType[3, torch.float32]
+  upper: TensorType[3, torch.float32] 
 
   def expand(self, d:float):
     return AABox(self.lower - d, self.upper + d)
@@ -43,13 +57,15 @@ class AABox(TensorClass):
   def render(self, colors=None):
     return render.boxes(self.lower, self.upper, colors=colors)
 
+
+
 @typechecked
 def voxel_grid(lower:TensorType[3], upper:TensorType[3], voxel_size:float) -> AABox:
   extents = upper - lower
   grid_size = np.ceil(extents / voxel_size).to(torch.long)
 
-  x, y, z = torch.meshgrid(*[torch.arange(x) for x in grid_size])
-  xyz = np.stack([x, y, z], axis=-1).reshape(-1, 3)
+  x, y, z = torch.meshgrid(*[torch.arange(x) for x in grid_size], indexing='ij')
+  xyz = torch.stack([x, y, z], axis=-1).reshape(-1, 3)
 
   offset = lower + (extents - grid_size * voxel_size) / 2
 
@@ -62,17 +78,22 @@ def voxel_grid(lower:TensorType[3], upper:TensorType[3], voxel_size:float) -> AA
 
 
 @dataclass
-class Segments(TensorClass):
-  """An axis aligned bounding box in 3D space."""
-  a: TensorType[..., 3, float]
-  b: TensorType[..., 3, float] 
-
+class Segment(TensorClass):
+  """Line segment between two points."""
+  a: TensorType[3, float]
+  b: TensorType[3, float] 
 
   @property
   def length(self):
     return np.linalg.norm(self.b - self.a, axis=-1)
 
 
+
+@dataclass
+class Tube(TensorClass):
+  """Line segment between two points."""
+  segments: Segment
+  radii: TensorType[2, float]
 
 
 
