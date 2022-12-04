@@ -34,9 +34,9 @@ def from_torch(x:torch.ndarray, dtype=None):
   return v
 
 @typechecked
-def torch_field(data, ti_struct:ti.lang.struct.StructType):
+def torch_field(data:TensorClass, ti_struct:ti.lang.struct.StructType):
   
-  field = ti_struct.field(shape=data.shape)
+  field = ti_struct.field(shape=data.prefix)
   field.from_torch(asdict(data))
   
   return field

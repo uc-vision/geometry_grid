@@ -36,16 +36,14 @@ class Skeleton:
         self.radii[self.edges[:, 0]], 
         self.radii[self.edges[:, 1]]], dim=-1).squeeze(1)
     
-    
     return Tube(segments=self.segments, radii=radii)
-
 
 
 @dataclass
 class AABox(TensorClass):
   """An axis aligned bounding box in 3D space."""
-  lower: TensorType[3, torch.float32]
-  upper: TensorType[3, torch.float32] 
+  lower: TensorType[3, float]
+  upper: TensorType[3, float] 
 
   def expand(self, d:float):
     return AABox(self.lower - d, self.upper + d)
