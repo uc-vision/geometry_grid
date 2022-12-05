@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, fields
+from dataclasses import InitVar, asdict, dataclass, field, fields
 import typing
 from torchtyping import patch_typeguard, ShapeDetail, DtypeDetail
 
@@ -45,11 +45,25 @@ def check_shape(name, shape, v):
     
   return prefix, suffix
   
-@dataclass(kw_only=True)
-class TensorClass:
-  broadcast: bool = False
+def check_dtype(name, dtype, v, convert=False):
+  if dtype is not None:
+    if not dtype.check(v):
+      if convert:
+        return v.to(dtype.dtype)
+      else:
+        raise TypeError(f"Expected {name} to have dtype {dtype.dtype}, got {v.dtype}")
 
-  def __post_init__(self):
+  return v
+
+@dataclass(kw_only=True, repr=False)
+class TensorClass:
+  # Broadcast prefixes shapes together
+  broadcast:  InitVar[bool] = False   
+
+  # Convert to annotated datatypes rather than throw TypeError
+  convert_types: InitVar[bool] = False  
+
+  def __post_init__(self, broadcast, convert_types):
     prefix, shapes = {}, {}
 
     for f in fields(self):
@@ -60,9 +74,7 @@ class TensorClass:
 
         assert shape is not None, f"Tensor {f.name} must have a shape annotation"
         prefix[f.name], shapes[f.name] = check_shape(f.name, shape, value)
-        if dtype is not None:
-          if not dtype.check(value):
-            raise TypeError(f"Expected {f.name} to have dtype {dtype.dtype}, got {value.dtype}")
+        value = check_dtype(f.name, dtype, value, convert_types)
 
       elif isinstance(value, TensorClass):
         prefix[f.name] = value.prefix
@@ -70,15 +82,15 @@ class TensorClass:
 
 
     self.shapes = shapes
-    if self.broadcast:
+    if broadcast:
       try:
-        common = torch.broadcast_shapes(*prefix.values())
-        for k, sh in shapes:
+        self.prefix = torch.broadcast_shapes(*prefix.values())
+        for k, sh in shapes.items():
           value = getattr(self, k)
           if isinstance(value, TensorClass):
-            setattr(self, k, value.expand(common))
+            setattr(self, k, value.expand(self.prefix))
           else:
-            setattr(self, k, value.expand(common + sh))
+            setattr(self, k, value.expand(self.prefix + sh))
 
       except RuntimeError as e:
         raise TypeError(f"Could not broadcast shapes {prefix}") from e
@@ -91,7 +103,6 @@ class TensorClass:
       self.prefix = prefixes.pop()
 
       
-
   def map(self, func):
     d = {k:(func(t) if isinstance(t, torch.Tensor) else t) 
       for k, t in asdict(self)}

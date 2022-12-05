@@ -75,7 +75,7 @@ def voxel_grid(lower:TensorType[3], upper:TensorType[3], voxel_size:float) -> AA
 
 
 
-@dataclass
+@dataclass()
 class Segment(TensorClass):
   """Line segment between two points."""
   a: TensorType[3, float]
@@ -84,6 +84,7 @@ class Segment(TensorClass):
   @property
   def length(self):
     return np.linalg.norm(self.b - self.a, axis=-1)
+
 
 
 

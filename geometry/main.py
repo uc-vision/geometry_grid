@@ -9,7 +9,9 @@ import torch
 from geometry.torch.loading import display_skeleton, load_tree
 
 from geometry.taichi.skeleton import BoxIntersection
-import geometry.taichi as tg
+import geometry.taichi as ti_g
+import geometry.torch as torch_g
+
 
 from open3d_vis import render
 import open3d as o3d
@@ -33,7 +35,7 @@ if __name__ == "__main__":
   boxes = voxel_grid(bounds.lower, bounds.upper, 100.0)
 
   tubes = skeleton.tubes
-  # s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
+  s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
 
   # s.compute()
 

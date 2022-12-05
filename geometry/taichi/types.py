@@ -21,17 +21,17 @@ class Sphere:
 class AABox:
   """An axis aligned bounding box in 3D space."""
 
-  min: vec3
-  max: vec3
+  lower: vec3
+  upper: vec3
 
   @ti.func
   def expand(self, d:ti.f32):
-    return AABox(self.min - d, self.max + d)
+    return AABox(self.lower - d, self.upper + d)
 
   @ti.func
   def contains(self, p:vec3):
     for i in ti.static(range(3)):
-      if p[i] < self.min[i] or p[i] > self.max[i]:
+      if p[i] < self.lower[i] or p[i] > self.upper[i]:
         return False
         
     return True
@@ -81,14 +81,14 @@ class Segment:
   def box_intersections(self, box:ti.template()):
     dir = self.dir()
 
-    a_start = (box.min - self.a) / dir
-    a_end = (box.max - self.a) / dir 
+    a_start = (box.lower - self.a) / dir
+    a_end = (box.upper - self.a) / dir 
 
-    b_start = (self.b - box.min) / dir
-    b_end = (self.b - box.max) / dir 
+    b_start = (self.b - box.lower) / dir
+    b_end = (self.b - box.upper) / dir 
 
-    return  ti.math.vec2(tm.min(a_start, a_end).min(),  
-      1 - tm.min(b_start, b_end).max())
+    return  ti.math.vec2(tm.min(a_start, a_end).lower(),  
+      1 - tm.min(b_start, b_end).upper())
 
 
   @ti.func
