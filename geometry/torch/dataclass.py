@@ -32,7 +32,6 @@ def annot_info(t) -> typing.Optional[ShapeDetail]:
 
       
 
-
 def check_shape(name, shape, v):
   if not isinstance(v, torch.Tensor):
     raise TypeError(f'{name} must be a tensor, got {type(v)}')

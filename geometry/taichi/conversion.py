@@ -33,9 +33,37 @@ def from_torch(x:torch.ndarray, dtype=None):
   v.from_torch(x)
   return v
 
+def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
+  data_name = data.__class__.__name__
+  
+  for k, v in ti_struct.members.items():
+    if not hasattr(data, k):
+      raise TypeError(f"Missing field in struct {k} in {data_name}")
+
+    if isinstance(v, ti.lang.matrix.VectorType):
+      if data.shapes[k] != v.get_shape():
+        raise TypeError(f"Expected {k} to have shape {v.get_shape()}, got {data.shapes[v]}")
+    elif isinstance(v, ti.lang.struct.StructType):
+      check_conversion(getattr(data, k), v)
+
+
+def taichi_shape(ti_type):
+  if isinstance(ti_type, ti.lang.struct.StructType):
+    return {k:taichi_shape(v) for k, v in ti_type.members.items()}
+
+  if (isinstance(ti_type, ti.lang.matrix.VectorType) or 
+      isinstance(ti_type, ti.lang.matrix.MatrixType)):
+    return dict(shape=ti_type.get_shape(), type=ti_type.dtype)
+
+  else:
+    raise TypeError(f"Unsupported type {ti_type}")
+
 @typechecked
 def torch_field(data:TensorClass, ti_struct:ti.lang.struct.StructType):
-  
+  ti_shape = taichi_shape(ti_struct)
+  shape = data.shape_info
+
+
   field = ti_struct.field(shape=data.prefix)
   field.from_torch(asdict(data))
   
