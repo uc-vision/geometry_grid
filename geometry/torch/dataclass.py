@@ -1,5 +1,6 @@
 from dataclasses import InitVar, asdict, dataclass, field, fields
 import typing
+from typing import Optional
 from torchtyping import patch_typeguard, ShapeDetail, DtypeDetail
 
 import torch
@@ -17,8 +18,14 @@ def annotation_details(t):
     if '__torchtyping__' in d:
       return d['details']
   
+@dataclass
+class TensorAnnotation:
+  shape: Optional[ShapeDetail]
+  dtype: Optional[DtypeDetail]
 
-def annot_info(t) -> typing.Optional[ShapeDetail]:
+
+
+def annot_info(t) -> Optional[TensorAnnotation]:
   details = annotation_details(t)
   shape, dtype = None, None
   if details:
@@ -28,19 +35,18 @@ def annot_info(t) -> typing.Optional[ShapeDetail]:
       elif isinstance(d, DtypeDetail):
         dtype = d
 
-    return shape, dtype
+  return TensorAnnotation(shape, dtype)
 
       
 
-def check_shape(name, shape, v):
-  if not isinstance(v, torch.Tensor):
-    raise TypeError(f'{name} must be a tensor, got {type(v)}')
-  n = len(shape.dims)
+def check_shape(name:str, sd:ShapeDetail, v:torch.Tensor):
+
+  n = len(sd.dims)
   prefix, suffix = v.shape[:-n], v.shape[-n:]
 
   fake = struct(shape=v.shape[-n:], names=[None] * n)
-  if not shape.check(fake):
-    raise TypeError(f"Expected {name} to have shape {shape.dims}, got {v.shape}")
+  if not sd.check(fake):
+    raise TypeError(f"Expected {name} to have shape {sd.dims}, got {v.shape}")
     
   return prefix, suffix
   
@@ -62,6 +68,7 @@ class TensorClass:
   # Convert to annotated datatypes rather than throw TypeError
   convert_types: InitVar[bool] = False  
 
+
   def __post_init__(self, broadcast, convert_types):
     prefix, shapes = {}, {}
 
@@ -69,18 +76,20 @@ class TensorClass:
       value = getattr(self, f.name)
       
       if isinstance(value, torch.Tensor):
-        shape, dtype = annot_info(f.type)
+        annot = annot_info(f.type)
 
-        assert shape is not None, f"Tensor {f.name} must have a shape annotation"
-        prefix[f.name], shapes[f.name] = check_shape(f.name, shape, value)
-        value = check_dtype(f.name, dtype, value, convert_types)
+        assert annot.shape is not None,\
+          f"Tensor {f.name} must have a shape annotation"
+
+        prefix[f.name], shapes[f.name] = check_shape(f.name, annot.shape, value)
+        value = check_dtype(f.name, annot.dtype, value, convert_types)
 
       elif isinstance(value, TensorClass):
         prefix[f.name] = value.prefix
-        shapes[f.name] = value.shapes
+        shapes[f.name] = value.shape
 
 
-    self.shapes = shapes
+    self.shape = shapes
     if broadcast:
       try:
         self.prefix = torch.broadcast_shapes(*prefix.values())
@@ -101,7 +110,24 @@ class TensorClass:
 
       self.prefix = prefixes.pop()
 
-      
+
+
+  @property 
+  def shape_info(self):
+
+    def field_info(k):
+      v = getattr(self, k)
+      if isinstance(v, TensorClass):
+        return v.shape_info
+      if isinstance(v, torch.Tensor):
+        return (self.shape[k], v.dtype)
+
+
+    return {f.name: field_info(f.name)  
+      for f in fields(self)
+    }
+
+
   def map(self, func):
     d = {k:(func(t) if isinstance(t, torch.Tensor) else t) 
       for k, t in asdict(self)}

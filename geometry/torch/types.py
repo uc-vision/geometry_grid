@@ -36,7 +36,7 @@ class Skeleton:
         self.radii[self.edges[:, 0]], 
         self.radii[self.edges[:, 1]]], dim=-1).squeeze(1)
     
-    return Tube(segments=self.segments, radii=radii)
+    return Tube(segment=self.segments, radii=radii)
 
 
 @dataclass
@@ -91,7 +91,7 @@ class Segment(TensorClass):
 @dataclass
 class Tube(TensorClass):
   """Line segment between two points."""
-  segments: Segment
+  segment: Segment
   radii: TensorType[2, float]
 
 

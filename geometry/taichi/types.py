@@ -1,7 +1,7 @@
 
 import dataclasses
 import taichi as ti
-from taichi.math import vec3, ivec3
+from taichi.math import vec3, ivec3, vec2
 import taichi.math as tm
 
 import numpy as np
@@ -97,18 +97,17 @@ class Segment:
     return i[0] <= i[1] and i[0] <= 1 and i[1] >= 0
 
 @ti.dataclass
-class Tubelet:
-  """ A tubelet is a capsule with radius 
+class Tube:
+  """ A tube is a capsule with radius 
   linearly changing along the segment. 
   """
   
-  seg: Segment
-  r1: ti.f32
-  r2: ti.f32
+  segment: Segment
+  radii: vec2
 
   @ti.func
   def radius_at(self, t:ti.f32):
-    return self.r1 + t * (self.r2 - self.r1)
+    return self.r[0] + t * (self.r[1]- self.r[0])
 
 
   def sdf(self, p:vec3):

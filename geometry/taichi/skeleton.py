@@ -2,10 +2,10 @@ import dataclasses
 import taichi as ti
 import numpy as np
 
-from geometry.torch import Skeleton, AABox
+from geometry import torch as torch_geom
 from typeguard import typechecked
 
-from geometry.taichi.types import AABox, Segment
+from geometry.taichi.types import AABox, Segment, Tube
 from .conversion import from_torch, torch_field
 
 
@@ -18,8 +18,8 @@ class Intersection:
 
 @ti.data_oriented
 class BoxIntersection:
-  def __init__(self, segments:Segment, boxes:AABox, max_intersections=10):
-    self.segments = segments
+  def __init__(self, tubes:Tube, boxes:AABox, max_intersections=10):
+    self.tubes = tubes
     self.boxes = boxes
 
     self.intersection = ti.field(ti.i32) # Intersection.field()
@@ -28,16 +28,16 @@ class BoxIntersection:
     hits.place(self.intersection)
 
     self.n_box = ti.field(ti.i32, shape=self.boxes.shape)
-    self.n_segment = ti.field(ti.i32, shape=self.segments.shape)
+    self.n_tube = ti.field(ti.i32, shape=self.tubes.shape)
 
     self.n_box.fill(0)
-    self.n_segment.fill(0)
+    self.n_tube.fill(0)
 
 
 
-  def from_torch(skeleton:Skeleton, boxes:AABox, max_intersections=10): 
+  def from_torch(skeleton:torch_geom.Skeleton, boxes:AABox, max_intersections=10): 
     return BoxIntersection(
-      segments=torch_field(skeleton.segments, Segment),
+      tubes=torch_field(skeleton.tubes, Tube),
       boxes=torch_field(boxes, AABox),
       max_intersections=max_intersections)
 
@@ -46,13 +46,13 @@ class BoxIntersection:
   def compute(self):
 
     for i in self.boxes:
-      for j in range(self.segments.shape[0]):
+      for j in range(self.tubes.shape[0]):
 
-        if self.segments[j].intersects_box(self.boxes[i]):
+        if self.tubes[j].intersects_box(self.boxes[i]):
           self.intersection[i].append(j)
           
           self.n_box[i] += 1
-          self.n_segment[j] += 1
+          self.n_tube[j] += 1
 
 
 

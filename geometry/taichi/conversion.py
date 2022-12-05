@@ -1,13 +1,13 @@
 from dataclasses import asdict, dataclass
 import taichi as ti
 
-import numpy as torch
+import torch
 from typeguard import typechecked
 
 from geometry.torch.dataclass import TensorClass
 from py_structs.torch import shape
 
-numpy_taichi = {
+torch_taichi = {
     torch.float32: ti.f32,
     torch.float64: ti.f64,
     torch.int32: ti.i32,
@@ -15,19 +15,21 @@ numpy_taichi = {
     torch.int8: ti.i8,
     torch.int16: ti.i16,
     torch.uint8: ti.u8,
-    torch.uint16: ti.u16,
+    # torch.uint16: ti.u16,
 }
 
-taichi_torch = {v:k for k,v in numpy_taichi.items()}
+
+
+taichi_torch = {v:k for k,v in torch_taichi.items()}
 
 
 @typechecked
-def from_torch(x:torch.ndarray, dtype=None):
+def from_torch(x:torch.Tensor, dtype=None):
   if dtype is not None:
     x = x.astype(taichi_torch[dtype])
   else:
-    assert x.dtype in numpy_taichi, f"Unsupported dtype {x.dtype}"
-    dtype = numpy_taichi[x.dtype]
+    assert x.dtype in torch_taichi, f"Unsupported dtype {x.dtype}"
+    dtype = torch_taichi[x.dtype]
 
   v = ti.Vector.field(x.shape[-1], dtype=dtype, shape=x.shape[:-1])
   v.from_torch(x)
@@ -53,16 +55,17 @@ def taichi_shape(ti_type):
 
   if (isinstance(ti_type, ti.lang.matrix.VectorType) or 
       isinstance(ti_type, ti.lang.matrix.MatrixType)):
-    return dict(shape=ti_type.get_shape(), type=ti_type.dtype)
+    return (ti_type.get_shape(), taichi_torch[ti_type.dtype])
 
   else:
     raise TypeError(f"Unsupported type {ti_type}")
 
+
+
 @typechecked
 def torch_field(data:TensorClass, ti_struct:ti.lang.struct.StructType):
-  ti_shape = taichi_shape(ti_struct)
-  shape = data.shape_info
-
+  if data.shape_info != taichi_shape(ti_struct):
+    raise TypeError(f"Expected shapes don't match:\n{data.shape_info}\n{taichi_shape(ti_struct)}")
 
   field = ti_struct.field(shape=data.prefix)
   field.from_torch(asdict(data))
