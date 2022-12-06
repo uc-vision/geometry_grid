@@ -20,14 +20,15 @@ def annotation_details(t):
   
 @dataclass
 class TensorAnnotation:
-  shape: Optional[ShapeDetail]
+  shape: ShapeDetail
   dtype: Optional[DtypeDetail]
 
 
 
 def annot_info(t) -> Optional[TensorAnnotation]:
   details = annotation_details(t)
-  shape, dtype = None, None
+  shape = ShapeDetail(dims=[], check_names=False)
+  dtype = None
   if details:
     for d in details:
       if isinstance(d, ShapeDetail):
@@ -42,7 +43,7 @@ def annot_info(t) -> Optional[TensorAnnotation]:
 def check_shape(name:str, sd:ShapeDetail, v:torch.Tensor):
 
   n = len(sd.dims)
-  prefix, suffix = v.shape[:-n], v.shape[-n:]
+  prefix, suffix = v.shape[:len(v.shape) - n], v.shape[len(v.shape) - n:]
 
   fake = struct(shape=v.shape[-n:], names=[None] * n)
   if not sd.check(fake):
@@ -61,7 +62,7 @@ def check_dtype(name, dtype, v, convert=False):
   return v
 
 @dataclass(kw_only=True, repr=False)
-class TensorClass:
+class TensorClass():
   # Broadcast prefixes shapes together
   broadcast:  InitVar[bool] = False   
 
@@ -85,14 +86,12 @@ class TensorClass:
         value = check_dtype(f.name, annot.dtype, value, convert_types)
 
       elif isinstance(value, TensorClass):
-        prefix[f.name] = value.prefix
-        shapes[f.name] = value.shape
-
-
-    self.shape = shapes
+        prefix[f.name] = value.shape
+        shapes[f.name] = value.shapes
+    
     if broadcast:
       try:
-        self.prefix = torch.broadcast_shapes(*prefix.values())
+        prefix = torch.broadcast_shapes(*prefix.values())
         for k, sh in shapes.items():
           value = getattr(self, k)
           if isinstance(value, TensorClass):
@@ -108,22 +107,22 @@ class TensorClass:
         raise TypeError(
             f"Expected all tensors to have the same prefix, got: {prefix}")
 
-      self.prefix = prefixes.pop()
+      prefix = prefixes.pop()
 
-
+    self.shape = prefix
+    self.shapes = shapes
 
   @property 
   def shape_info(self):
 
-    def field_info(k):
+    def info(k):
       v = getattr(self, k)
       if isinstance(v, TensorClass):
         return v.shape_info
       if isinstance(v, torch.Tensor):
-        return (self.shape[k], v.dtype)
+        return (self.shapes[k], v.dtype)
 
-
-    return {f.name: field_info(f.name)  
+    return {f.name: info(f.name)  
       for f in fields(self)
     }
 

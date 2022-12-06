@@ -67,7 +67,7 @@ def torch_field(data:TensorClass, ti_struct:ti.lang.struct.StructType):
   if data.shape_info != taichi_shape(ti_struct):
     raise TypeError(f"Expected shapes don't match:\n{data.shape_info}\n{taichi_shape(ti_struct)}")
 
-  field = ti_struct.field(shape=data.prefix)
+  field = ti_struct.field(shape=data.shape)
   field.from_torch(asdict(data))
   
   return field

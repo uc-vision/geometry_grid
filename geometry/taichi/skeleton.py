@@ -30,8 +30,6 @@ class BoxIntersection:
     self.n_box = ti.field(ti.i32, shape=self.boxes.shape)
     self.n_tube = ti.field(ti.i32, shape=self.tubes.shape)
 
-    self.n_box.fill(0)
-    self.n_tube.fill(0)
 
 
 

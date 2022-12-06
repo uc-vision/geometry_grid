@@ -87,8 +87,15 @@ class Segment:
     b_start = (self.b - box.lower) / dir
     b_end = (self.b - box.upper) / dir 
 
-    return  ti.math.vec2(tm.min(a_start, a_end).lower(),  
-      1 - tm.min(b_start, b_end).upper())
+
+    # t1 = torch.minimum(a_start, a_end).max(dim=2).values
+    # t2 = 1 - torch.minimum(b_start, b_end).max(dim=2).values
+
+
+    return  vec2(
+      tm.min(a_start, a_end).max(),  
+      1 - tm.min(b_start, b_end).max()
+    )
 
 
   @ti.func
@@ -111,12 +118,15 @@ class Tube:
 
 
   def sdf(self, p:vec3):
-    t, dist_sq = self.seg.point_dist_sq(p)
+    t, dist_sq = self.segment.point_dist_sq(p)
     r = self.radius_at(t)
     return ti.sqrt(dist_sq) - r
   
-  def approx_intersects_box(self, box:AABox):
-    r = ti.min([self.r1, self.r2])
-    box = box.expand(r)
+  @ti.func
+  def intersects_box(self, box:ti.template()):
+    return self.segment.intersects_box(box)
 
-    return self.seg.intersects_box(box)
+  # def approx_intersects_box(self, box:AABox):
+  #   r = ti.min([self.r1, self.r2])
+  #   box = box.expand(r)
+  #   return self.seg.intersects_box(box)
