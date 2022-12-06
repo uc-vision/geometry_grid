@@ -85,7 +85,26 @@ class Segment(TensorClass):
   def length(self):
     return np.linalg.norm(self.b - self.a, axis=-1)
 
+  
+  def box_intersections(self, bounds:AABox):
+    bounds = bounds.unsqueeze(1)
+    seg = self.unsqueeze(0)
 
+    dir = seg.b - seg.a
+
+    a_start = (bounds.lower - seg.a) / dir
+    a_end = (bounds.upper - seg.a) / dir 
+
+    b_start = (seg.b - bounds.lower) / dir
+    b_end = (seg.b - bounds.upper) / dir 
+
+    return  (torch.minimum(a_start, a_end).max(dim=2).values,  
+      1 - torch.minimum(b_start, b_end).max(dim=2).values)
+
+
+  def intersects_box(self, box:AABox):
+    i = self.box_intersections(box)
+    return (i[0] <= i[1]) & (i[0] <= 1) & (i[1] >= 0)
 
 
 @dataclass
@@ -93,8 +112,5 @@ class Tube(TensorClass):
   """Line segment between two points."""
   segment: Segment
   radii: TensorType[2, float]
-
-
-
 
 

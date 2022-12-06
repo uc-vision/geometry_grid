@@ -128,10 +128,21 @@ class TensorClass:
     }
 
 
-  def map(self, func):
-    d = {k:(func(t) if isinstance(t, torch.Tensor) else t) 
-      for k, t in asdict(self)}
+  def __iter__(self):
+    fs = fields(self)
+    for f in fs:
+      yield (f.name, getattr(self, f.name))
 
+  def map(self, func):
+    def f(t):
+      if isinstance(t, torch.Tensor):
+        return func(t)
+      elif isinstance(t, TensorClass):
+        return t.map(func)
+      else:
+        return t
+
+    d = {k:f(t) for k, t in iter(self)}
     return self.__class__(**d)
 
   def __getitem__(self, slice):
@@ -142,6 +153,10 @@ class TensorClass:
 
   def expand(self, shape):
     return self.map(lambda t: t.expand(shape))
+
+
+  def unsqueeze(self, dim):
+    return self.map(lambda t: t.unsqueeze(dim))
 
 
   def __repr__(self):

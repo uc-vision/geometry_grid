@@ -13,6 +13,8 @@ import geometry.taichi as ti_g
 import geometry.torch as torch_g
 
 
+from py_structs.torch import shape
+
 from open3d_vis import render
 import open3d as o3d
 
@@ -34,14 +36,16 @@ if __name__ == "__main__":
   bounds = skeleton.bounds
   boxes = voxel_grid(bounds.lower, bounds.upper, 100.0)
 
-  tubes = skeleton.tubes
-  s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
 
+  # s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
   # s.compute()
-
   # idx = np.flatnonzero(s.n_box.to_numpy())
   
+  hits = torch.any(skeleton.segments.intersects_box(boxes), dim=1)
+  idx = torch.nonzero(hits)
+
+  print(idx)
+
   skel = render.line_set(skeleton.points, skeleton.edges)
-  o3d.visualization.draw(skel)
-  # o3d.visualization.draw([skel, boxes[idx].render()])
+  o3d.visualization.draw([skel, boxes[idx].render()])
 
