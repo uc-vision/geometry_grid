@@ -32,7 +32,6 @@ class BoxIntersection:
 
 
 
-
   def from_torch(skeleton:torch_geom.Skeleton, boxes:AABox, max_intersections=10): 
     return BoxIntersection(
       tubes=torch_field(skeleton.tubes, Tube),

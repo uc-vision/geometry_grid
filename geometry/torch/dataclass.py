@@ -27,16 +27,18 @@ class TensorAnnotation:
 
 def annot_info(t) -> Optional[TensorAnnotation]:
   details = annotation_details(t)
-  shape = ShapeDetail(dims=[], check_names=False)
   dtype = None
-  if details:
+
+  if details is not None:
+    shape = ShapeDetail(dims=[], check_names=False)
+
     for d in details:
       if isinstance(d, ShapeDetail):
         shape = d
       elif isinstance(d, DtypeDetail):
         dtype = d
 
-  return TensorAnnotation(shape, dtype)
+    return TensorAnnotation(shape, dtype)
 
       
 
@@ -79,11 +81,12 @@ class TensorClass():
       if isinstance(value, torch.Tensor):
         annot = annot_info(f.type)
 
-        assert annot.shape is not None,\
-          f"Tensor {f.name} must have a shape annotation"
+        if annot is None or annot.shape is None:
+          raise TypeError(f"Tensor field '{f.name}' must have a shape annotation")
 
         prefix[f.name], shapes[f.name] = check_shape(f.name, annot.shape, value)
         value = check_dtype(f.name, annot.dtype, value, convert_types)
+        setattr(self, f.name, value)
 
       elif isinstance(value, TensorClass):
         prefix[f.name] = value.shape
@@ -155,6 +158,7 @@ class TensorClass():
 
 
   def unsqueeze(self, dim):
+    assert dim <= len(self.shape), f"Cannot unsqueeze dim {dim} in shape {self.shape}"
     return self.map(lambda t: t.unsqueeze(dim))
 
 

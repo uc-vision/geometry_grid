@@ -45,8 +45,16 @@ class Segment:
   b: vec3
 
   @ti.func
-  def dir(self):
+  def dir(self) -> vec3:
     return self.b - self.a
+
+  @ti.func
+  def point_at(self, t:ti.f32) -> vec3:
+    return self.a + t * self.dir()
+
+  @ti.func
+  def line(self):
+    return Line(self.a, self.dir())
 
   @ti.func
   def length_sq(self):
@@ -78,18 +86,28 @@ class Segment:
     return ti.sqrt(dist_sq)
 
   @ti.func
-  def box_intersections(self, box:ti.template()):
-    dir = self.dir()
+  def segment_closest(seg1, seg2:ti.template()) -> vec2:
+    line2 = seg2.line()
+    line1 = seg1.line()
 
-    a_start = (box.lower - self.a) / dir
-    a_end = (box.upper - self.a) / dir 
+    t = line1.line_closest(line2)
+    return tm.clamp(t, 0., 1.)
 
-    b_start = (self.b - box.lower) / dir
-    b_end = (self.b - box.upper) / dir 
+  @ti.func
+  def segment_distance(seg1, seg2:ti.template()) -> ti.f32:
+    t = seg1.segment_closest(seg2)
+    return tm.distance(seg1.point_at(t[0]), seg2.point_at(t[1]))
 
 
-    # t1 = torch.minimum(a_start, a_end).max(dim=2).values
-    # t2 = 1 - torch.minimum(b_start, b_end).max(dim=2).values
+  @ti.func
+  def box_intersections(self, box:ti.template()) -> vec2:
+    d = self.dir() + 1e-8
+    
+    a_start = (box.lower - self.a) / d
+    a_end = (box.upper - self.a) / d 
+
+    b_start = (self.b - box.lower) / d
+    b_end = (self.b - box.upper) / d 
 
 
     return  vec2(
@@ -102,6 +120,42 @@ class Segment:
   def intersects_box(self, box:ti.template()):
     i = self.box_intersections(box)
     return i[0] <= i[1] and i[0] <= 1 and i[1] >= 0
+
+
+
+
+
+@ti.dataclass
+class Line:
+  p: vec3
+  dir: vec3
+
+  @ti.func
+  def line_closest(line1, line2:ti.template(), eps=1e-8) -> vec2:    
+    v21 = line2.p - line1.p
+      
+    proj11 = tm.dot(line1.dir, line1.dir)
+    proj22 = tm.dot(line2.dir, line2.dir)
+
+    proj21 = tm.dot(line2.dir, line1.dir)
+    proj21_1 = tm.dot(v21, line1.dir)
+    proj21_2 = tm.dot(v21, line2.dir)
+
+    denom = proj21 * proj21 - proj22 * proj11
+
+    s1 = 0.0
+    t1 = proj21_1 / (proj21 + eps)
+
+    s2 = (proj21_2 * proj21 - proj22 * proj21_1) / denom
+    t2 = (-proj21_1 * proj21 + proj11 * proj21_2) / denom
+
+    s = ti.select(denom > eps, s1, s2)
+    t = ti.select(denom > eps, t1, t2)
+
+    return vec2(s, t)
+
+
+
 
 @ti.dataclass
 class Tube:
@@ -124,9 +178,48 @@ class Tube:
   
   @ti.func
   def intersects_box(self, box:ti.template()):
-    return self.segment.intersects_box(box)
+    t = self.segment.box_intersections(box)
+
+
+  
 
   # def approx_intersects_box(self, box:AABox):
   #   r = ti.min([self.r1, self.r2])
   #   box = box.expand(r)
   #   return self.seg.intersects_box(box)
+
+if __name__ == '__main__':
+  
+  ti.init(arch=ti.cpu, debug=True)
+
+  box = AABox(vec3(-0.5, -0.5, -0.5), vec3(0.5, 0.5, 0.5))
+  seg = Segment(vec3(-2, 0, 0), vec3(0, 2, 0))
+
+
+
+
+  @ti.kernel
+  def test_seg_box() -> vec2:
+    return seg.box_intersections(box)
+
+  print(test_seg_box())
+  
+
+  seg1 = Segment(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0))
+  seg2 = Segment(vec3(0.1, 0.0, -0.5), vec3(0.1, 0.0, 1.0))
+
+
+  @ti.kernel
+  def test_line_line() -> vec2:
+    line1 = seg1.line()
+    line2 = seg2.line()
+    return line1.line_closest(line2)
+
+  print(test_line_line())
+
+ 
+  @ti.kernel
+  def test_seg_seg() -> ti.f32:
+    return seg1.segment_distance(seg2)
+
+  print(test_seg_seg())

@@ -38,12 +38,16 @@ if __name__ == "__main__":
 
   s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
   s.compute()
-  box_idx = np.flatnonzero(s.n_box.to_numpy())
+
+  box_hits = s.n_box.to_numpy()
+  box_idx = np.flatnonzero(box_hits > 0)
+
+  print(box_hits[box_idx])
   
   # hits = skeleton.segments.box_intersections(boxes)  
   # box_idx = torch.nonzero( torch.any(hits.valid, dim=1) ).squeeze()
 
-
+  
 
   skel = render.line_set(skeleton.points, skeleton.edges)
   o3d.visualization.draw([skel, boxes[box_idx].render()])
