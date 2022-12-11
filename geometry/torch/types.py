@@ -36,6 +36,13 @@ class Skeleton:
     
     return Tube(segment=self.segments, radii=radii)
 
+@dataclass 
+class Sphere(TensorClass):
+  center: TensorType[3, float]
+  radius: TensorType[float]
+
+  def render(self, colors=None):
+    return render.spheres(self.center, self.radius, colors=colors) 
 
 @dataclass
 class AABox(TensorClass):

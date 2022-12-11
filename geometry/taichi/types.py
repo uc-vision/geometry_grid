@@ -29,6 +29,16 @@ class AABox:
     return AABox(self.lower - d, self.upper + d)
 
   @ti.func
+  def extents(self):
+    return self.upper - self.lower
+
+  @ti.func
+  def union(self, box:ti.template()):
+    return AABox(
+        ti.min(self.lower, box.lower), 
+        ti.max(self.upper, box.upper))
+
+  @ti.func
   def contains(self, p:vec3):
     for i in ti.static(range(3)):
       if p[i] < self.lower[i] or p[i] > self.upper[i]:
@@ -36,6 +46,16 @@ class AABox:
         
     return True
 
+
+  @ti.func 
+  def distance(self, p:vec3):
+    d = vec3(0.)
+    for i in ti.static(range(3)):
+      if p[i] < self.lower[i]:
+        d[i] = p[i] - self.lower[i]
+      elif p[i] > self.upper[i]:
+        d[i] = p[i] - self.upper[i]
+    return ti.sqrt(tm.dot(d, d))
 
 @ti.dataclass
 class Segment:
@@ -175,18 +195,57 @@ class Tube:
     t, dist_sq = self.segment.point_dist_sq(p)
     r = self.radius_at(t)
     return ti.sqrt(dist_sq) - r
-  
+
+  @ti.func
+  def radius_at(self, t:ti.f32):
+    return self.radii[0] + t * (self.radii[1]- self.radii[0])
+
+  @ti.func
+  def segment_distance(self, segment:ti.template()) -> ti.f32:
+    t = self.segment.segment_closest(segment)
+    d = tm.distance(self.segment.point_at(t[0]), segment.point_at(t[1]))
+
+    r = self.radius_at(t[0])
+    return d - r
+    
   @ti.func
   def intersects_box(self, box:ti.template()):
-    t = self.segment.box_intersections(box)
+    if self.segment.box_intersections(box):
+      return True
 
+    l = box.lower
+    u = box.upper
+    edges = [
+      Segment(vec3(l.x, l.y, l.z), vec3(u.x, l.y, l.z)),
+      Segment(vec3(l.x, u.y, l.z), vec3(u.x, u.y, l.z)),
+      Segment(vec3(l.x, l.y, u.z), vec3(u.x, l.y, u.z)),
+      Segment(vec3(l.x, u.y, u.z), vec3(u.x, u.y, u.z)),
 
+      Segment(vec3(l.x, l.y, l.z), vec3(l.x, u.y, l.z)),
+      Segment(vec3(u.x, l.y, l.z), vec3(u.x, u.y, l.z)),
+      Segment(vec3(l.x, l.y, u.z), vec3(l.x, u.y, u.z)),
+      Segment(vec3(u.x, l.y, u.z), vec3(u.x, u.y, u.z)),
+
+      Segment(vec3(l.x, l.y, l.z), vec3(l.x, l.y, u.z)),
+      Segment(vec3(u.x, l.y, l.z), vec3(u.x, l.y, u.z)),
+      Segment(vec3(l.x, u.y, l.z), vec3(l.x, u.y, u.z)),
+      Segment(vec3(u.x, u.y, l.z), vec3(u.x, u.y, u.z))
+    ]
+
+    for e in edges:
+      if self.segment_distance(e) <= 0.:
+        return True
+
+    d1 = box.distance(self.segment.a)
+    d2 = box.distance(self.segment.b)
+
+    return d1 < self.r[0] or d2 < self.r[1]
   
 
-  # def approx_intersects_box(self, box:AABox):
-  #   r = ti.min([self.r1, self.r2])
-  #   box = box.expand(r)
-  #   return self.seg.intersects_box(box)
+  def approx_intersects_box(self, box:AABox):
+    r = ti.max([self.r1, self.r2])
+    box = box.expand(r)
+    return self.seg.intersects_box(box)
 
 if __name__ == '__main__':
   
