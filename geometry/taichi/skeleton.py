@@ -18,7 +18,6 @@ class Intersection:
   i : ti.i32
 
 
-ti.ScalarField
 
 @ti.data_oriented
 class BoxIntersection:
@@ -74,9 +73,11 @@ class Grid:
     self.size = size
 
     self.intersection = ti.field(ti.i32) # Intersection.field()
-    box = ti.root.pointer(ti.ijk, size)
-    hits = box.dynamic(ti.l, max_intersections, chunk_size=4)
+    self.box:ti.SNode = ti.root.pointer(ti.ijk, size)
+    hits = self.box.dynamic(ti.l, max_intersections, chunk_size=4)
     hits.place(self.intersection)
+
+
 
   def from_torch(box:torch_geom.AABox, size:Tuple[int, int, int] | int,  max_intersections=10): 
     assert box.shape == ()
@@ -103,6 +104,22 @@ class Grid:
           for l in range(tubes.shape[0]):
             if tubes[l].segment.intersects_box(box):
               self.intersection[i,j,k].append(l)
+
+  @ti.kernel
+  def _get_counts(self) -> int:
+    n = 0
+    for i in ti.grouped(self.box):
+      n = n + self.intersection[i.x, i.y, i.z].length()
+
+    return n
+
+  def get_counts(self):
+    print(self._get_counts())
+
+
+  def subdivide(self, tubes:ti.template()):
+
+
 
 
 if __name__ == "__main__":

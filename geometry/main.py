@@ -49,6 +49,9 @@ if __name__ == "__main__":
   tubes = from_torch(skeleton.tubes) 
   grid.intersect_tubes(tubes)
 
+  grid.get_counts()
+
+
   # s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
   # s.compute()
 
