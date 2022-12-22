@@ -73,13 +73,12 @@ class Grid:
     self.size = size
 
     self.intersection = ti.field(ti.i32) # Intersection.field()
-    self.box:ti.SNode = ti.root.pointer(ti.ijk, size)
+    self.box:ti.SNode = ti.root.bitmasked(ti.ijk, size)
     hits = self.box.dynamic(ti.l, max_intersections, chunk_size=4)
     hits.place(self.intersection)
 
 
-
-  def from_torch(box:torch_geom.AABox, size:Tuple[int, int, int] | int,  max_intersections=10): 
+  def from_torch(box:torch_geom.AABox, size:Tuple[int, int, int] | int,  max_intersections=60): 
     assert box.shape == ()
 
     return Grid(
@@ -87,37 +86,69 @@ class Grid:
       size = size if isinstance(size, tuple) else (size, size, size),
       max_intersections=max_intersections)
 
-  @ti.kernel
-  def intersect_tubes(self, tubes:ti.template()):
+  @ti.func
+  def get_inc(self) -> Tuple[vec3, vec3]:
     b = self.bounds[0]
     extents = b.extents()
-    d = [extents[i] / self.size[i] for i in range(3)]
+
+    return b.lower, extents / vec3(self.size)
+
+
+  @ti.kernel
+  def intersect_dense(self, objects:ti.template()):
+    lower, inc = self.get_inc()
 
     for i in range(self.size[0]):
       for j in range(self.size[1]):
         for k in range(self.size[2]):
-          box = AABox(
-            b.lower + vec3(i,j,k) * d,
-            b.lower + vec3(i+1,j+1,k+1) * d)
-            
+          b = lower + vec3(i,j,k) * inc 
+          box = AABox(b, b + inc)
 
-          for l in range(tubes.shape[0]):
-            if tubes[l].segment.intersects_box(box):
+          for l in range(objects.shape[0]):
+            if objects[l].intersects_box(box):
               self.intersection[i,j,k].append(l)
 
   @ti.kernel
-  def _get_counts(self) -> int:
+  def _get_counts(self) -> ti.math.ivec2:
+    entries = 0
     n = 0
+    
     for i in ti.grouped(self.box):
-      n = n + self.intersection[i.x, i.y, i.z].length()
+      entries +=  self.intersection[i.x, i.y, i.z].length()
+      n += 1
 
-    return n
+    return ti.math.ivec2(n, entries)
 
   def get_counts(self):
-    print(self._get_counts())
+    return self._get_counts()
 
+    
 
-  def subdivide(self, tubes:ti.template()):
+  @ti.kernel
+  def _subdivide(self, intersections:ti.template(), objects:ti.template()):
+    lower, inc = self.get_inc()
+    
+    children = [
+      vec3(0,0,0), vec3(0,0,1), vec3(0,1,0), vec3(0,1,1), 
+      vec3(1,0,0), vec3(1,0,1), vec3(1,1,0), vec3(1,1,1)]
+
+    for i in ti.grouped(intersections):
+      idx = intersections[i]
+      base = lower + vec3(i.x, i.y, i.z) * inc
+
+      for offset in ti.static(children):
+        b = base + offset * inc / 2.0
+        box = AABox(b, b + inc / 2.0)
+        
+        if objects[idx].intersects_box(box):
+          self.intersection[i.x, i.y, i.z].append(idx) 
+
+  def subdivided(self, objects:ti.Field):
+    grid = Grid(self.bounds, tuple(x * 2 for x in self.size))
+
+    grid._subdivide(self.intersection, objects)
+    return grid
+
 
 
 

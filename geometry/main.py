@@ -22,7 +22,7 @@ import open3d as o3d
 from geometry.torch.types import voxel_grid
 
 
-ti.init(arch=ti.cuda)
+ti.init(arch=ti.cuda, debug=True)
 
 @ti.func
 def point_bounds(points:ti.template(dim=1)) -> ti_geom.AABox:
@@ -42,14 +42,17 @@ if __name__ == "__main__":
   parser.add_argument("filename", type=Path)
   args = parser.parse_args()
 
-  skeleton = load_tree(args.filename, radius_threshold=4.0)
+  skeleton = load_tree(args.filename, radius_threshold=10)
 
   grid = Grid.from_torch(skeleton.bounds, 8, 64)
 
-  tubes = from_torch(skeleton.tubes) 
-  grid.intersect_tubes(tubes)
+  tubes = from_torch(skeleton.tubes.segment) 
+  grid.intersect_dense(tubes)
 
-  grid.get_counts()
+  print(grid.get_counts())
+  grid = grid.subdivided(tubes)
+
+  print(grid.get_counts())
 
 
   # s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
