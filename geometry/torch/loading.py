@@ -18,7 +18,7 @@ def load_tree(filename:Path, radius_threshold=3.0):
   r = skeleton['skeleton_radii']
 
   edges = skeleton['skeleton_edges']
-  valid = (r > radius_threshold).reshape(-1)
+  valid = np.flatnonzero((r > radius_threshold).reshape(-1))
 
   radii = np.zeros( (v.shape[0], 1) ) 
   radii[edges[:, 0]] = r

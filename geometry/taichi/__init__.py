@@ -1,3 +1,3 @@
 from .types import *
-from .skeleton import *
+from .grid import *
 from .conversion import *

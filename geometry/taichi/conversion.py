@@ -66,7 +66,7 @@ def taichi_shape(ti_type):
     raise TypeError(f"Unsupported type {ti_type}")
 
 
-conversions = {
+torch_ti_mapping = {
   torch_geom.Sphere : ti_geom.Sphere,
   torch_geom.AABox : ti_geom.AABox,
   torch_geom.Segment : ti_geom.Segment,
@@ -74,13 +74,18 @@ conversions = {
   torch_geom.Tube : ti_geom.Tube
 }
 
+ti_torch_mapping = {v:k for k,v in torch_ti_mapping.items()}
+
+
+def find_struct(tensor_class:type):
+  assert tensor_class in torch_ti_mapping, f"Unsupported type {tensor_class}"
+  return torch_ti_mapping[tensor_class]
+
+
 
 @typechecked
-def torch_field(data:TensorClass, ti_struct:Optional[ti.lang.struct.StructType]=None):
-  assert ti_struct is not None or data.__class__ in conversions,\
-    f"Unsupported type {data.__class__}, please specify ti_struct parameter"
-
-  ti_struct = conversions[data.__class__] if ti_struct is None else ti_struct
+def torch_field(data:TensorClass):
+  ti_struct = find_struct(data.__class__)
 
   if data.shape_info != taichi_shape(ti_struct):
     raise TypeError(f"Expected shapes don't match:\n{data.shape_info}\n{taichi_shape(ti_struct)}")
@@ -89,6 +94,8 @@ def torch_field(data:TensorClass, ti_struct:Optional[ti.lang.struct.StructType]=
   field.from_torch(asdict(data))
   
   return field
+
+
 
 
 @typechecked

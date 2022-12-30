@@ -9,20 +9,16 @@ import torch
 from geometry.taichi.conversion import from_torch, torch_field
 from geometry.torch.loading import display_skeleton, load_tree
 
-from geometry.taichi.skeleton import BoxIntersection, Grid
+from geometry.taichi.grid import Grid
 import geometry.taichi as ti_geom
 import geometry.torch as torch_geom
 
 
-from py_structs.torch import shape
-
 from open3d_vis import render
 import open3d as o3d
 
-from geometry.torch.types import voxel_grid
 
-
-ti.init(arch=ti.cuda, debug=True)
+ti.init(arch=ti.cuda, offline_cache=True, log_level=ti.DEBUG)
 
 @ti.func
 def point_bounds(points:ti.template(dim=1)) -> ti_geom.AABox:
@@ -42,17 +38,19 @@ if __name__ == "__main__":
   parser.add_argument("filename", type=Path)
   args = parser.parse_args()
 
-  skeleton = load_tree(args.filename, radius_threshold=10)
-
-  grid = Grid.from_torch(skeleton.bounds, 8, 64)
+  skeleton = load_tree(args.filename, radius_threshold=0)
 
   tubes = from_torch(skeleton.tubes.segment) 
+
+  grid = Grid.from_torch(skeleton.bounds, 64, max_occupied=64)
   grid.intersect_dense(tubes)
 
-  print(grid.get_counts())
-  grid = grid.subdivided(tubes)
 
-  print(grid.get_counts())
+  # print(grid.get_counts())
+
+  # for i in range(4):
+  #   grid = grid.subdivided(tubes)
+
 
 
   # s = BoxIntersection.from_torch(skeleton, boxes, max_intersections=10)
@@ -66,8 +64,9 @@ if __name__ == "__main__":
   # hits = skeleton.segments.box_intersections(boxes)  
   # box_idx = torch.nonzero( torch.any(hits.valid, dim=1) ).squeeze()
 
-  
+  boxes = torch_geom.AABox(**grid.get_boxes().to_torch())
 
-  # skel = render.line_set(skeleton.points, skeleton.edges)
-  # o3d.visualization.draw([skel, boxes[box_idx].render()])
+
+  skel = render.line_set(skeleton.points, skeleton.edges)
+  o3d.visualization.draw([skel, boxes.render()])
 
