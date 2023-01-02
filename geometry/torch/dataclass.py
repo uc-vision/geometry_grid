@@ -1,7 +1,9 @@
 from dataclasses import InitVar, asdict, dataclass, field, fields
+from numbers import Number
 import typing
 from typing import Optional
 from torchtyping import patch_typeguard, ShapeDetail, DtypeDetail
+from typeguard import typechecked
 
 import torch
 
@@ -71,10 +73,15 @@ class TensorClass():
   # Convert to annotated datatypes rather than throw TypeError
   convert_types: InitVar[bool] = False  
 
+  @classmethod
+  def annot_info(cls):
+    return {f.name:annot_info(f) for f in fields(cls)}      
+    
 
   def __post_init__(self, broadcast, convert_types):
     prefix, shapes = {}, {}
 
+    self.device = None
     for f in fields(self):
       value = getattr(self, f.name)
       
@@ -87,6 +94,11 @@ class TensorClass():
         prefix[f.name], shapes[f.name] = check_shape(f.name, annot.shape, value)
         value = check_dtype(f.name, annot.dtype, value, convert_types)
         setattr(self, f.name, value)
+
+        if self.device is not None and self.device != value.device:
+          raise TypeError(f"Expected all tensors to have the same dtype, got {self.device} and {value.device}")
+        self.device = value.device
+
 
       elif isinstance(value, TensorClass):
         prefix[f.name] = value.shape
@@ -155,6 +167,33 @@ class TensorClass():
 
   def expand(self, shape):
     return self.map(lambda t: t.expand(shape))
+
+  @classmethod
+  @typechecked
+  def empty(cls:type, shape=(), device='cpu', **kwargs):
+    if isinstance(shape, Number):
+      shape = (shape,)
+    
+    def make_tensor(k, info):
+      if k in kwargs:
+        return kwargs[k]
+      
+
+      if info is None:
+        raise RuntimeError(f"{k}: has no argument or tensor annotation")
+
+      if info.dtype is None:
+        raise RuntimeError(f"{k}: has no dtype annotation")
+      
+      field_shape = (d.size for d in info.shape.dims)
+      return torch.empty( tuple( (*shape, *field_shape) ), 
+        dtype=info.dtype.dtype, device=device)
+
+
+    return cls(**{f.name:make_tensor(f.name, annot_info(f.type)) 
+      for f in fields(cls)}) 
+
+
 
 
   def unsqueeze(self, dim):

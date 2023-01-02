@@ -25,38 +25,30 @@ def point_bounds(points:ti.template()) -> AABox:
   return b
 
 
-
-
+def from_aabox(box:torch_geom.AABox):
+  assert box.shape == ()
+  l, u = [x.cpu().numpy() for x in [box.lower, box.upper]]
+  return AABox(l, u)
 
 
 @ti.data_oriented
 class Grid:
-  def __init__(self, bounds:AABox, size:Tuple[int, int, int]):
+  @typechecked
+  def __init__(self, bounds:AABox, size:ivec3):
 
     self.bounds = bounds 
     self.size = size
 
 
-  def from_torch(box:torch_geom.AABox, 
-    size:Tuple[int, int, int] | int): 
-    assert box.shape == ()
-
-    return Grid(
-      bounds=torch_field(box.unsqueeze(0)),
-      size = size if isinstance(size, tuple) else (size, size, size))
+  def from_torch(box:torch_geom.AABox, size:Tuple[int, int, int] | int): 
+    return Grid(bounds=from_aabox(box), size = ivec3(size))
     
 
   @ti.func
   def get_inc(self) -> Tuple[vec3, vec3]:
-    b = self.bounds[0]
-    inc = (b.upper - b.lower) / self.size
-    return b.lower, inc
+    inc = (self.bounds.upper - self.bounds.lower) / self.size
+    return self.bounds.lower, inc
 
-
-  def add_objects(self, objects):
-    
-    self._intersect_dense(objects)
-    self.objects = objects
 
   @ti.func 
   def grid_bounds(self, b):  
@@ -68,6 +60,12 @@ class Grid:
     return (ti.cast(ti.math.max(start, int(0)), ti.i32), 
             ti.cast(ti.math.min(end, ivec3(self.size)), ti.i32))
 
+  @ti.func
+  def cell_bounds(self, cell:ivec3) -> AABox:
+    lower, inc = self.get_inc()
+    return AABox(lower + cell * inc, lower + (cell + 1) * inc)
+
+
 
 @ti.dataclass
 class PointQuery:
@@ -76,128 +74,154 @@ class PointQuery:
 
     distance: ti.f32
     index: ti.i32
+    comparisons: ti.i32
 
     @ti.func
     def update(self, index, other):
       d = other.point_distance(self.point)
-      old = ti.atomic_min(self.distance, d)
-      if old == self.distance:
-        self.index = index
+      if d < self.radius:
+        old = ti.atomic_min(self.distance, d)
+        if old == self.distance:
+          self.index = index
+
 
     @ti.func
-    def bounds(self) -> AABox:
-      return AABox(self.point - self.radius, self.point + self.radius)
+    def bounds(self):
+      lower = self.point - self.radius
+      upper = self.point + self.radius
+      return AABox(lower, upper)
 
-def point_query(points:torch.Tensor, radius:float):
-    n = points.shape[0]
-    queries = PointQuery.field(shape=n)
-    queries.from_torch(dict(
-      points = points, 
-      radius = torch.full((n,), radius, dtype=torch.float32, device=points.device),
-      distance = torch.full((n,), torch.inf, dtype=torch.float32, device=points.device),
-      index = torch.full((n,), -1, dtype=torch.int32, device=points.device)
-    ))
 
-    return queries
+
 
 
 @ti.data_oriented
 class ObjectGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64):
+  def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64, grid_chunk=4, device='cuda:0'):
 
     self.occupied = ti.field(ti.i32)
+    level1:ti.SNode = ti.root.bitmasked(ti.ijk, [x//grid_chunk for x in grid.size])
+    self.cells:ti.SNode = level1.bitmasked(ti.ijk, (grid_chunk,grid_chunk,grid_chunk))
+    lists = self.cells.dynamic(ti.l, max_occupied, chunk_size=8)
+    lists.place(self.occupied)
 
-    ptr:ti.SNode = ti.root.pointer(ti.ijk, [x//2 for x in grid.size])
-    self.cells:ti.SNode = ptr.bitmasked(ti.ijk, (2,2,2))
-    
-    hits = self.cells.dynamic(ti.l, max_occupied, chunk_size=4)
-    hits.place(self.occupied)
-
+    self.grid = grid
     self.objects = objects
-    self._add_objects(objects)
+    self.total_cells, self.total_entries = [
+      int(n) for n in self._add_objects(objects)]
+    
+    self.device = device
 
-
+  @typechecked
   def from_torch(box:torch_geom.AABox, 
     size:Tuple[int, int, int] | int,
     objects:TensorClass,
     max_occupied=64): 
 
-    assert box.shape == ()
-
-    grid = Grid(
-      bounds=torch_field(box.unsqueeze(0)),
-      size = size if isinstance(size, tuple) else (size, size, size))
-
+    grid =  Grid(bounds=from_aabox(box), size = ivec3(size))
     return ObjectGrid(grid, from_torch(objects), max_occupied=max_occupied)
 
   @ti.kernel
-  def _add_objects(self, objects:ti.template()):
-    lower, inc = self.grid.get_inc()
-    
+  def _add_objects(self, objects:ti.template()) -> ti.math.ivec2:
+    total_entries = 0
     for l in range(objects.shape[0]):
       obj = objects[l]
-      start, end = self.grid_bounds(obj.bounds())
+      start, end = self.grid.grid_bounds(obj.bounds())
 
       for i in range(start.x, end.x):
         for j in range(start.y, end.y):
           for k in range(start.z, end.z):
-            box = AABox(lower + vec3(i,j,k) * inc, lower + vec3(i+1,j+1,k+1) * inc)
+            box = self.grid.cell_bounds(ivec3(i,j,k))
+
             if obj.intersects_box(box):
+              total_entries += 1
               self.occupied[i,j,k].append(l)
 
+    total_cells = 0
+    
+    for i,j,k in self.cells:
+      total_cells += 1
 
-  @ti.kernel
-  def _query(self, queries:ti.template()):
-
-    for l in range(queries.shape[0]):
-      query = queries[l]
-      start, end = self.grid_bounds(query.bounds())
-      for i in range(start.x, end.x):
-        for j in range(start.y, end.y):
-          for k in range(start.z, end.z):
-
-            for idx in self.occupied[i,j,k]:
-              query.update(idx, self.objects[idx])
-
-
-  def point_query(self, points:torch.Tensor, radius:float):
-    query = point_query(points, radius)
-    self._query(query)
-
-    result = query.to_torch()
-    return result.index, result.distance
-
-
-  @ti.kernel
-  def _get_counts(self) -> ti.math.ivec2:
-    entries = 0
-    n = 0
-    for i in ti.grouped(self.cells):
-      entries +=  self.occupied[i.x, i.y, i.z].length()
-      n += 1
-    return ti.math.ivec2(n, entries)
-
-  def get_counts(self):
-    return tuple(int(x) for x in self._get_counts())
-
-
-  @ti.kernel
-  def _get_boxes(self, boxes:ti.template()):
-    lower, inc = self.get_inc()
-    for i in ti.grouped(self.cells):
-      b = lower + vec3(i.x,i.y,i.z) * inc 
-      box = AABox(b, b + inc)
-      boxes.append(box)
-
-
-  def get_boxes(self):
-    n, _ = self.get_counts()
-    boxes = AABox.field()
-    ti.root.dynamic(ti.i, n).place(boxes)
-    self._get_boxes(boxes)
-    return boxes
+    return ti.math.vec2(total_cells, total_entries)
 
   
+  @ti.func
+  def grid_bounds(self, obj):
+    return self.grid.grid_bounds(obj)
+
+  @ti.func
+  def _run_query(self, query:ti.template()):
+      start, end = self.grid_bounds(query.bounds())
+
+      # ti.loop_config(serialize=True)
+      for i in range(start.x, end.x):
+
+        # ti.loop_config(serialize=True)
+        for j in range(start.y, end.y):
+
+          # ti.loop_config(serialize=True)
+          for k in range(start.z, end.z):
+
+            # ti.loop_config(serialize=True)
+            for l in range(self.occupied[i,j,k].length()):
+              idx = self.occupied[i,j,k,l]
+              query.update(idx, self.objects[idx])
+
+  @ti.kernel
+  def _point_query(self, 
+    points:ti.types.ndarray(vec3, ndim=1), radius:ti.f32,
+    distances:ti.types.ndarray(ti.f32, ndim=1),
+    indexes:ti.types.ndarray(ti.i32, ndim=1)):
+    
+    for i in range(points.shape[0]):
+      q = PointQuery(points[i], radius, distance=torch.inf, index=-1)
+      self._run_query(q)
+
+      distances[i] = q.distance
+      indexes[i] = q.index
+
+
+  def point_query(self, points:torch.Tensor, radius:float) -> Tuple[torch.FloatTensor, torch.IntTensor]:
+    distances = torch.empty((points.shape[0],), device=points.device, dtype=torch.float32)
+    indexes = torch.empty_like(distances, dtype=torch.int32)
+
+    self._point_query(points, radius, distances, indexes)
+    return distances, indexes
+
+
+  @ti.kernel
+  def _active_cells(self, cells:ti.template(), 
+    counts:ti.types.ndarray(ti.i32, ndim=1),
+    lower:ti.types.ndarray(vec3, ndim=1),
+    upper:ti.types.ndarray(vec3, ndim=1)
+    ):
+
+    for i in ti.grouped(self.cells):
+      cells.append(ivec3(i.x, i.y, i.z))
+
+    for i in range(self.total_cells):
+      v = cells[i]
+      counts[i] = self.occupied[v.x, v.y, v.z].length()
+
+      box = self.grid.cell_bounds(ivec3(v.x, v.y, v.z))
+      lower[i] = box.lower
+      upper[i] = box.upper
+
+
+  def active_cells(self):
+    cells = ivec3.field()
+    l = ti.root.dynamic(ti.i, self.total_cells, 
+      chunk_size=self.total_cells).place(cells)
+
+    counts = torch.zeros(self.total_cells, device=self.device)
+    boxes = torch_geom.AABox.empty(self.total_cells)
+
+    self._active_cells(cells, counts, boxes.lower, boxes.upper)
+    return cells.to_torch(), counts, boxes
+
+
+
+
 
 if __name__ == "__main__":
   ti.init(arch=ti.gpu)

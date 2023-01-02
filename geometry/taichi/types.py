@@ -121,7 +121,7 @@ class Segment:
     dist_sq = tm.dot(delta_p, delta_p)
     pb = p - self.b
 
-    dist_sq = ti.select(l2 >= eps, dist_sq, ti.dot(pb, pb))
+    dist_sq = ti.select(l2 >= eps, dist_sq, tm.dot(pb, pb))
     return t, dist_sq
 
   @ti.func
