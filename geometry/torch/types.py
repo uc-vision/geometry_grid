@@ -60,6 +60,11 @@ class AABox(TensorClass):
   def render(self, colors=None):
     return render.boxes(self.lower, self.upper, colors=colors)
 
+  def random_points(self, n:int):
+    return torch.rand(n, 3, device=self.device) * self.extents + self.lower
+
+  def clamp(self, points:TensorType[..., 3, torch.float32]):
+    return torch.clamp(points, self.lower, self.upper)
 
 
 @typechecked

@@ -2,6 +2,8 @@ import dataclasses
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3
+from taichi.types import ndarray
+
 import numpy as np
 
 from geometry import torch as torch_geom
@@ -40,9 +42,15 @@ class Grid:
     self.size = size
 
 
-  def from_torch(box:torch_geom.AABox, size:Tuple[int, int, int] | int): 
+  def fixed_size(box:torch_geom.AABox, size:Tuple[int, int, int] | int): 
     return Grid(bounds=from_aabox(box), size = ivec3(size))
     
+  def fixed_cell(box:torch_geom.AABox, cell_size:float):
+    grid_size = torch.ceil((box.upper - box.lower) / cell_size)
+    bounds = torch_geom.AABox(box.lower, box.lower + grid_size * cell_size)
+
+    return Grid(bounds=from_aabox(bounds), size = ivec3(grid_size.cpu().numpy()))
+
 
   @ti.func
   def get_inc(self) -> Tuple[vec3, vec3]:
@@ -58,13 +66,39 @@ class Grid:
     end = ti.ceil((b.upper - lower) / inc)
 
     return (ti.cast(ti.math.max(start, int(0)), ti.i32), 
-            ti.cast(ti.math.min(end, ivec3(self.size)), ti.i32))
+            ti.cast(ti.math.min(end, self.size), ti.i32))
+
+  @ti.func 
+  def grid_cell(self, p:vec3) -> ivec3:
+    lower, inc = self.get_inc()
+    return ti.cast((p - lower) / inc, ti.i32)
+
 
   @ti.func
   def cell_bounds(self, cell:ivec3) -> AABox:
     lower, inc = self.get_inc()
     return AABox(lower + cell * inc, lower + (cell + 1) * inc)
 
+  @ti.func
+  def in_bounds(self, cell:ivec3) -> bool:
+    return (0 <= cell).all() and (cell < self.size).all()
+
+  @ti.kernel
+  def _get_boxes(self, cells:ndarray(ivec3, ndim=1),
+    lower:ndarray(vec3, ndim=1), 
+    upper:ndarray(vec3, ndim=1)):
+    for i in range(cells.shape[0]):
+      v = cells[i]
+      
+      box = self.cell_bounds(ivec3(v.x, v.y, v.z))
+      lower[i] = box.lower
+      upper[i] = box.upper
+
+
+  def get_boxes(self, cells:torch.Tensor):
+    boxes = torch_geom.AABox.empty(cells.shape[0])
+    self._get_boxes(cells, boxes.lower, boxes.upper)
+    return boxes
 
 
 @ti.dataclass
@@ -81,143 +115,28 @@ class PointQuery:
       d = other.point_distance(self.point)
       if d < self.radius:
         old = ti.atomic_min(self.distance, d)
-        if old == self.distance:
+        if old != self.distance:
           self.index = index
 
 
     @ti.func
-    def bounds(self):
+    def bounds(self) -> AABox:
       lower = self.point - self.radius
       upper = self.point + self.radius
       return AABox(lower, upper)
 
-
-
-
-
-@ti.data_oriented
-class ObjectGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64, grid_chunk=4, device='cuda:0'):
-
-    self.occupied = ti.field(ti.i32)
-    level1:ti.SNode = ti.root.bitmasked(ti.ijk, [x//grid_chunk for x in grid.size])
-    self.cells:ti.SNode = level1.bitmasked(ti.ijk, (grid_chunk,grid_chunk,grid_chunk))
-    lists = self.cells.dynamic(ti.l, max_occupied, chunk_size=8)
-    lists.place(self.occupied)
-
-    self.grid = grid
-    self.objects = objects
-    self.total_cells, self.total_entries = [
-      int(n) for n in self._add_objects(objects)]
-    
-    self.device = device
-
-  @typechecked
-  def from_torch(box:torch_geom.AABox, 
-    size:Tuple[int, int, int] | int,
-    objects:TensorClass,
-    max_occupied=64): 
-
-    grid =  Grid(bounds=from_aabox(box), size = ivec3(size))
-    return ObjectGrid(grid, from_torch(objects), max_occupied=max_occupied)
-
-  @ti.kernel
-  def _add_objects(self, objects:ti.template()) -> ti.math.ivec2:
-    total_entries = 0
-    for l in range(objects.shape[0]):
-      obj = objects[l]
-      start, end = self.grid.grid_bounds(obj.bounds())
-
-      for i in range(start.x, end.x):
-        for j in range(start.y, end.y):
-          for k in range(start.z, end.z):
-            box = self.grid.cell_bounds(ivec3(i,j,k))
-
-            if obj.intersects_box(box):
-              total_entries += 1
-              self.occupied[i,j,k].append(l)
-
-    total_cells = 0
-    
-    for i,j,k in self.cells:
-      total_cells += 1
-
-    return ti.math.vec2(total_cells, total_entries)
-
+@ti.kernel
+def _load_segments(f:ti.template(), 
+  a:ti.types.ndarray(dtype=vec3, ndim=1), 
+  b:ti.types.ndarray(dtype=vec3, ndim=1)):
   
-  @ti.func
-  def grid_bounds(self, obj):
-    return self.grid.grid_bounds(obj)
+  for i in range(f.shape[0]):
+    f[i] = Segment(a[i], b[i])
 
-  @ti.func
-  def _run_query(self, query:ti.template()):
-      start, end = self.grid_bounds(query.bounds())
-
-      # ti.loop_config(serialize=True)
-      for i in range(start.x, end.x):
-
-        # ti.loop_config(serialize=True)
-        for j in range(start.y, end.y):
-
-          # ti.loop_config(serialize=True)
-          for k in range(start.z, end.z):
-
-            # ti.loop_config(serialize=True)
-            for l in range(self.occupied[i,j,k].length()):
-              idx = self.occupied[i,j,k,l]
-              query.update(idx, self.objects[idx])
-
-  @ti.kernel
-  def _point_query(self, 
-    points:ti.types.ndarray(vec3, ndim=1), radius:ti.f32,
-    distances:ti.types.ndarray(ti.f32, ndim=1),
-    indexes:ti.types.ndarray(ti.i32, ndim=1)):
-    
-    for i in range(points.shape[0]):
-      q = PointQuery(points[i], radius, distance=torch.inf, index=-1)
-      self._run_query(q)
-
-      distances[i] = q.distance
-      indexes[i] = q.index
-
-
-  def point_query(self, points:torch.Tensor, radius:float) -> Tuple[torch.FloatTensor, torch.IntTensor]:
-    distances = torch.empty((points.shape[0],), device=points.device, dtype=torch.float32)
-    indexes = torch.empty_like(distances, dtype=torch.int32)
-
-    self._point_query(points, radius, distances, indexes)
-    return distances, indexes
-
-
-  @ti.kernel
-  def _active_cells(self, cells:ti.template(), 
-    counts:ti.types.ndarray(ti.i32, ndim=1),
-    lower:ti.types.ndarray(vec3, ndim=1),
-    upper:ti.types.ndarray(vec3, ndim=1)
-    ):
-
-    for i in ti.grouped(self.cells):
-      cells.append(ivec3(i.x, i.y, i.z))
-
-    for i in range(self.total_cells):
-      v = cells[i]
-      counts[i] = self.occupied[v.x, v.y, v.z].length()
-
-      box = self.grid.cell_bounds(ivec3(v.x, v.y, v.z))
-      lower[i] = box.lower
-      upper[i] = box.upper
-
-
-  def active_cells(self):
-    cells = ivec3.field()
-    l = ti.root.dynamic(ti.i, self.total_cells, 
-      chunk_size=self.total_cells).place(cells)
-
-    counts = torch.zeros(self.total_cells, device=self.device)
-    boxes = torch_geom.AABox.empty(self.total_cells)
-
-    self._active_cells(cells, counts, boxes.lower, boxes.upper)
-    return cells.to_torch(), counts, boxes
+def load_segments(segs:torch_geom.Segment):
+  f = Segment.field(shape=segs.shape[0])
+  _load_segments(f, segs.a, segs.b)
+  return f
 
 
 

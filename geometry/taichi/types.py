@@ -28,6 +28,10 @@ class AABox:
   def expand(self, d:ti.f32):
     return AABox(self.lower - d, self.upper + d)
 
+  @ti.func 
+  def center(self):
+    return (self.lower + self.upper) / 2
+
   @ti.func
   def extents(self):
     return self.upper - self.lower
