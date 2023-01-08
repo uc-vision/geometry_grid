@@ -101,29 +101,7 @@ class Grid:
     return boxes
 
 
-@ti.dataclass
-class PointQuery:
-    point: vec3
-    radius: ti.f32
 
-    distance: ti.f32
-    index: ti.i32
-    comparisons: ti.i32
-
-    @ti.func
-    def update(self, index, other):
-      d = other.point_distance(self.point)
-      if d < self.radius:
-        old = ti.atomic_min(self.distance, d)
-        if old != self.distance:
-          self.index = index
-
-
-    @ti.func
-    def bounds(self) -> AABox:
-      lower = self.point - self.radius
-      upper = self.point + self.radius
-      return AABox(lower, upper)
 
 @ti.kernel
 def _load_segments(f:ti.template(), 

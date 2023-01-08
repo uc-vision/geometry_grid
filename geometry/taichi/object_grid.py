@@ -13,35 +13,18 @@ from taichi.types import ndarray
 
 
 @ti.func
-def _run_query(self:ti.template(), query:ti.template()):
-  start, end = self.grid.grid_bounds(query.bounds())
+def _query_grid(object_grid:ti.template(), query:ti.template()):
+  start, end = object_grid.grid.grid_bounds(query.bounds())
 
   for i in range(start.x, end.x):
     for j in range(start.y, end.y):
       for k in range(start.z, end.z):
-        self._query_cell(i,j,k, query)
+        object_grid._query_cell(i,j,k, query)
 
 
-@ti.kernel
-def _point_query(self:ti.template(), 
-  points:ndarray(vec3, ndim=1), radius:ti.f32,
-  distances:ndarray(ti.f32, ndim=1), indexes:ndarray(ti.i32, ndim=1)):
-  
-  for i in range(points.shape[0]):
-    q = PointQuery(points[i], radius, distance=torch.inf, index=-1)
-    _run_query(self,  q)
-
-    distances[i] = q.distance
-    indexes[i] = q.index
-
-
-def grid_point_query(self, points:torch.Tensor, radius:float) -> Tuple[torch.FloatTensor, torch.IntTensor]:
-  distances = torch.empty((points.shape[0],), device=points.device, dtype=torch.float32)
-  indexes = torch.empty_like(distances, dtype=torch.int32)
-
-  _point_query(self, points, radius, distances, indexes)
-  return distances, indexes
-
+def block_bitmask(size, chunk):
+    cell_blocks:ti.SNode = ti.root.bitmasked(ti.ijk, [1 + x//chunk for x in size])
+    return cell_blocks.bitmasked(ti.ijk, (chunk,chunk,chunk))
 
 @ti.data_oriented
 class GridIndex:
@@ -49,9 +32,16 @@ class GridIndex:
     index:ti.ndarray):
     
     self.grid = grid
-    self.objects = objects
+
+    # Dense field of all objects
+    self.objects = objects 
+
+    # Sparse field (ivec2) which contains the pair
+    # (index, count) which finds the entries in self.index
     self.cell_index = cell_index
-    self.index = index
+
+    # List of all object indexes in cells, ordered by cell
+    self.index = index 
 
   @ti.func
   def _query_cell(self, i:ti.int32, j:ti.int32, k:ti.int32, query:ti.template()):
@@ -62,12 +52,9 @@ class GridIndex:
       idx = self.index[index + l]
       query.update(idx, self.objects[idx])
 
-  point_query = grid_point_query
 
+  query = _query_grid
 
-def block_bitmask(size, chunk):
-    cell_blocks:ti.SNode = ti.root.bitmasked(ti.ijk, [1 + x//chunk for x in size])
-    return cell_blocks.bitmasked(ti.ijk, (chunk,chunk,chunk))
 
 @ti.data_oriented
 class DynamicGrid:
@@ -92,6 +79,7 @@ class DynamicGrid:
     return DynamicGrid(grid, from_torch(objects), 
       max_occupied=max_occupied, device=objects.device)
 
+  query = _query_grid
 
   @ti.kernel
   def _add_objects(self, objects:ti.template()) -> ti.math.ivec2:
@@ -125,7 +113,6 @@ class DynamicGrid:
       idx = self.occupied[i,j,k,l]
       query.update(idx, self.objects[idx])
 
-  point_query = grid_point_query
 
   @ti.kernel
   def _active_cells(self, cells:ti.template(), 
