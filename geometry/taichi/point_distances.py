@@ -13,11 +13,11 @@ from taichi.math import vec3
 def atomic_min_index(dist:ti.f32, index:ti.int32, 
     prev_dist:ti.f32, prev_index:ti.int32):
   old = ti.atomic_min(prev_dist, dist)
-  if old != prev_dist:
-      return dist, index
-  else:
-      return prev_dist, prev_index
-
+  if old == prev_dist:
+    dist = prev_dist
+    index = prev_index    
+  return dist, index
+  
 
 @ti.func
 def _min_distance(objects:ti.template(), 
@@ -41,7 +41,6 @@ def _min_distances(objects:ti.template(),
 
   for j in range(points.shape[0]):
     distances[j], indices[j] = _min_distance(objects, points[j], radius)
-  return distances, indices
 
 
 def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
