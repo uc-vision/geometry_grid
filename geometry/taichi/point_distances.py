@@ -7,6 +7,8 @@ from geometry.torch.random import random_segments
 from ..torch.dataclass import TensorClass
 from geometry.taichi.conversion import from_torch
 
+from taichi.math import vec3
+
 @ti.func 
 def atomic_min_index(dist:ti.f32, index:ti.int32, 
     prev_dist:ti.f32, prev_index:ti.int32):
@@ -29,6 +31,7 @@ def _min_distance(objects:ti.template(),
         min_d, index = atomic_min_index(d, i, min_d, index)
 
     return min_d, index
+
 
 
 @ti.kernel
@@ -63,52 +66,6 @@ def distances(objects:TensorClass, points:torch.Tensor):
   objs = from_torch(objects)
   _distances(objs, points, distances)
   return distances
-
-
-
-
-
-
-@ti.data_oriented
-def point_distance(objects:TensorClass, num_points:int):
-
-  points = ti.Vector.field(3, dtype=ti.f32, shape=num_points)
-  distances = ti.field(dtype=ti.f32, shape=num_points)
-  indices = ti.field(dtype=ti.i32, shape=num_points)
-
-  objects = from_torch(objects)
-
-  @ti.kernel
-  def _min_distances(n:ti.int32, max_radius:ti.f32):
-    for j in range(n):
-      distances[j], indices[j] = _min_distance(objects, points[j], max_radius)
-    return distances, indices
-
-  class DistanceFunc(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, input_points:torch.Tensor, max_radius:float=torch.inf):
-
-        out_dist = torch.empty(points.shape[0], device=points.device, dtype=torch.float32)
-        points.from_torch(input_points)
-    
-        _min_distances(points.shape[0], torch.inf)
-        distances.to_torch(out_dist)
-
-        return out_dist
-
-    @staticmethod
-    def backward(ctx, outp_grad):
-      ti.clear_all_gradients()
-      distances.grad.from_torch(outp_grad)
-      _min_distances.grad()
-
-      inp_grad = torch.empty(points.shape[0], device=points.device, dtype=torch.float32)
-      distances.grad.to_torch(inp_grad)
-      
-      return inp_grad
-
-  def __call__(self, points:torch.Tensor):
-    assert points.shape[0] <= self.points.shape[0]
 
 
 
