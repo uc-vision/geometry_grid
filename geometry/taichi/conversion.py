@@ -67,6 +67,7 @@ def taichi_shape(ti_type):
 
 
 torch_ti_mapping = {
+  torch_geom.Point : ti_geom.Point,
   torch_geom.Sphere : ti_geom.Sphere,
   torch_geom.AABox : ti_geom.AABox,
   torch_geom.Segment : ti_geom.Segment,

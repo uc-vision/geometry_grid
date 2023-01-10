@@ -17,6 +17,40 @@ class Sphere:
         # a function to run in taichi scope
         return 4 * np.pi * self.radius * self.radius
 
+    @ti.func
+    def intersects_box(self, box:ti.template()):
+      box.point_distance(self.center) <= self.radius
+
+    @ti.func
+    def bounds(self):
+      return AABox(self.center - self.radius, self.center + self.radius)
+
+    @ti.func 
+    def point_distance(self, p:vec3):
+      return (p - self.center).norm() - self.radius
+
+
+
+@ti.dataclass
+class Point:
+    p: vec3
+
+    @ti.func
+    def intersects_box(self, box:ti.template()):
+      return box.contains(self.p)
+
+    @ti.func
+    def bounds(self):
+      return AABox(self.p, self.p)
+
+
+    @ti.func 
+    def point_distance(self, p:vec3):
+      return (p - self.center).norm()
+
+
+bvec3 = ti.types.vector(3, bool)
+
 @ti.dataclass
 class AABox:
   """An axis aligned bounding box in 3D space."""
@@ -44,11 +78,8 @@ class AABox:
 
   @ti.func
   def contains(self, p:vec3):
-    for i in ti.static(range(3)):
-      if p[i] < self.lower[i] or p[i] > self.upper[i]:
-        return False
-        
-    return True
+    outside = bvec3([p[i] < self.lower[i] or p[i] > self.upper[i] for i in ti.static(range(3))])
+    return outside.any()
 
 
   @ti.func 
@@ -75,10 +106,7 @@ class AABox:
   def distance(self, p:vec3):
     d = vec3(0.)
     for i in ti.static(range(3)):
-      if p[i] < self.lower[i]:
-        d[i] = p[i] - self.lower[i]
-      elif p[i] > self.upper[i]:
-        d[i] = p[i] - self.upper[i]
+      d[i] +=  ti.max(0., p[i] - self.lower[i]) + ti.max(0., p[i] - self.upper[i])
     return ti.sqrt(tm.dot(d, d))
 
 @ti.dataclass

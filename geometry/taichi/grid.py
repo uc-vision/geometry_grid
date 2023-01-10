@@ -68,6 +68,13 @@ class Grid:
     return (ti.cast(ti.math.max(start, int(0)), ti.i32), 
             ti.cast(ti.math.min(end, self.size), ti.i32))
 
+
+  @ti.func 
+  def grid_ranges(self, b):  
+    lower, upper = self.grid_bounds(b)
+    return ((lower.x, upper.x), (lower.y, upper.y), (lower.z, upper.z))
+
+
   @ti.func 
   def grid_cell(self, p:vec3) -> ivec3:
     lower, inc = self.get_inc()
@@ -99,24 +106,6 @@ class Grid:
     boxes = torch_geom.AABox.empty(cells.shape[0])
     self._get_boxes(cells, boxes.lower, boxes.upper)
     return boxes
-
-
-
-
-@ti.kernel
-def _load_segments(f:ti.template(), 
-  a:ti.types.ndarray(dtype=vec3, ndim=1), 
-  b:ti.types.ndarray(dtype=vec3, ndim=1)):
-  
-  for i in range(f.shape[0]):
-    f[i] = Segment(a[i], b[i])
-
-def load_segments(segs:torch_geom.Segment):
-  f = Segment.field(shape=segs.shape[0])
-  _load_segments(f, segs.a, segs.b)
-  return f
-
-
 
 
 

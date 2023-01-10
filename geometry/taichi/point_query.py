@@ -40,7 +40,7 @@ def _point_query(object_grid:ti.template(),
   
   for i in range(points.shape[0]):
     q = PointQuery(points[i], radius, distance=torch.inf, index=-1)
-    object_grid.query(q)
+    object_grid._query_grid(q)
 
     distances[i] = q.distance
     indexes[i] = q.index
