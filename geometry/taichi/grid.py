@@ -1,7 +1,7 @@
 import dataclasses
 from typing import Tuple
 import taichi as ti
-from taichi.math import vec3, ivec3
+from taichi.math import vec3, ivec3, clamp
 from taichi.types import ndarray
 
 import numpy as np
@@ -65,13 +65,13 @@ class Grid:
     start = ti.floor((b.lower - lower) / inc)
     end = ti.ceil((b.upper - lower) / inc)
 
-    return (ti.cast(ti.math.max(start, int(0)), ti.i32), 
-            ti.cast(ti.math.min(end, self.size), ti.i32))
-
+    return (ti.cast(clamp(start, 0, self.size), ti.i32), 
+            ti.cast(clamp(end, 0, self.size), ti.i32))
 
   @ti.func 
   def grid_ranges(self, b):  
     lower, upper = self.grid_bounds(b)
+
     return ((lower.x, upper.x), (lower.y, upper.y), (lower.z, upper.z))
 
 

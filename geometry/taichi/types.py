@@ -78,8 +78,7 @@ class AABox:
 
   @ti.func
   def contains(self, p:vec3):
-    outside = bvec3([p[i] < self.lower[i] or p[i] > self.upper[i] for i in ti.static(range(3))])
-    return outside.any()
+    return (p >= self.lower).all() and (p <= self.upper).all()
 
 
   @ti.func 

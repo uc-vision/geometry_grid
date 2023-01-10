@@ -158,12 +158,15 @@ class Segment(TensorClass):
 
   @property
   def length(self):
-    return np.linalg.norm(self.b - self.a, axis=-1)
-
+    return torch.norm(self.dir, dim=-1)
 
   @cached_property
   def dir(self):
     return self.b - self.a
+
+  @cached_property
+  def unit_dir(self):
+    return self.dir / self.length.unsqueeze(-1)
 
   @cached_property
   def line(self):
@@ -194,7 +197,7 @@ class Segment(TensorClass):
 
     return Hit(seg, t1, t2)
 
-  def points(self, t:TensorType[..., float]):
+  def points_at(self, t:TensorType[..., float]):
     return self.a + (self.b - self.a) * t.unsqueeze(-1)
 
 
@@ -205,6 +208,9 @@ class Tube(TensorClass):
   """Line segment between two points."""
   segment: Segment
   radii: TensorType[2, float]
+
+  def radius_at(self, t):
+    return self.radii[:, 0] + (self.radii[:, 1] - self.radii[:, 0]) * t
 
 
 

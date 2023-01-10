@@ -181,19 +181,21 @@ class CountedGrid:
     self.grid_chunk=grid_chunk
     
     self.cells = block_bitmask(grid.size, grid_chunk)
-    self.counts.place(self.occupied)
+    self.cells.place(self.counts)
 
     self.grid = grid
     self.objects = objects
 
     self.total_cells, self.total_entries = [
       int(n) for n in self._count_objects(objects)]
+      
     
     self.device = device
 
   @typechecked
   def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8): 
-    return CountedGrid(grid, from_torch(objects), grid_chunk,  device=objects.device)
+    return CountedGrid(grid, from_torch(objects), 
+      grid_chunk,  device=objects.device)
 
   # @ti.func
   # def _query_grid(self, query:ti.template()):
@@ -212,6 +214,7 @@ class CountedGrid:
       
       for cell in ti.grouped(ti.ndrange(*ranges)):
         box = self.grid.cell_bounds(cell)
+
         if obj.intersects_box(box):
           total_entries += 1
           self.counts[cell.x, cell.y, cell.z] += 1
@@ -240,9 +243,7 @@ class CountedGrid:
       cells.append(i)
 
     for i in range(self.total_cells):
-      v = cells[i]
-      counts[i] = self.occupied[v.x, v.y, v.z].length()
-
+      counts[i] = self.counts[cells[i]]
 
 
   def active_cells(self) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -254,36 +255,3 @@ class CountedGrid:
 
     self._active_cells(cells, counts)
     return cells.to_torch(), counts
-
-  @ti.kernel
-  def _fill_index(self, prefix:ndarray(ti.i32, ndim=1), 
-    counts:ndarray(ti.i32, ndim=1), coords:ndarray(ivec3, ndim=1),
-    cell_index:ti.template(), index:ti.template()):
-
-    for i in range(self.total_cells):
-      v = coords[i]
-      p = ti.select(i > 0, prefix[i - 1], 0)
-
-      for j in range(counts[i]):
-        idx = self.occupied[v.x, v.y, v.z, j]
-        index[p + j] = idx
-
-      cell_index[v.x, v.y, v.z] = ivec2(p, counts[i])
-
-
-  def make_index(self):
-
-    coords, counts = self.active_cells()
-    prefix = torch.cumsum(counts, dim=0, dtype=torch.int32)
-
-    index = ti.field(ti.i32, self.total_entries)
-
-    cell_index = ivec2.field()
-    sparse = block_bitmask(self.grid.size, self.grid_chunk)
-    sparse.place(cell_index)
-
-    self._fill_index(prefix, counts, coords, cell_index, index)
-    return GridIndex(self.grid, self.objects, cell_index, index)
-
-
-

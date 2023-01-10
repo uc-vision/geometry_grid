@@ -7,13 +7,24 @@ from typeguard import typechecked
 
 
 @typechecked
-def around_segments(segments:torch_geom.Segment, radius:float, n:int):
-  i = torch.randint(low=0, high=segments.shape[0] -1, 
-    size=(int(n),), device=segments.device)
+def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
+  i = torch.randint(low=0, high=tubes.shape[0] -1, 
+    size=(int(n),), device=tubes.device)
+
+  tubes = tubes[i]
+  segments = tubes.segment
 
   t = torch.rand(n, device=segments.device) 
-  r = torch.rand(n, 3, device=segments.device) * 2.0  - 1.0
-  return segments[i].points(t) + r * radius
+  radius = tubes.radius_at(t)
+
+  p = torch.randn(n, 3, device=segments.device) * point_var
+
+  normal = torch.cross(torch.rand(n, 3, device=segments.device) - 0.5, segments[i].dir) 
+  r = radius.unsqueeze(-1) * (normal / torch.norm(normal, dim=1, keepdim=True))
+
+  return segments[i].points_at(t) + p + r
+
+  
 
 def random_segments(bounds:torch_geom.AABox, 
   length_range:Tuple[float, float]=(0.5, 2.0), n:int=100):
