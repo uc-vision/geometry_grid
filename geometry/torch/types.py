@@ -45,15 +45,12 @@ class Sphere(TensorClass):
     return render.spheres(self.center, self.radius, colors=colors) 
 
 
-
 @dataclass 
 class Point(TensorClass):
   p: TensorType[3, float]
 
   def render(self, colors=None):
     return render.point_cloud(self.p, colors=colors) 
-
-
 
 
 @dataclass

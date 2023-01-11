@@ -177,33 +177,29 @@ class DynamicGrid:
 class CountedGrid:
   def __init__(self, grid:Grid, objects:ti.Field, grid_chunk=8, device='cuda:0'):
     
-    self.counts = ti.field(ti.i32)
+    self.counts = ti.field(ti.ivec2)
+    self.chunk_counts = ti.field(ti.ivec2)
+    
     self.grid_chunk=grid_chunk
     
     self.cells = block_bitmask(grid.size, grid_chunk)
     self.cells.place(self.counts)
+
+    self.cells.parent().place(self.chunk_counts)
 
     self.grid = grid
     self.objects = objects
 
     self.total_cells, self.total_entries = [
       int(n) for n in self._count_objects(objects)]
-      
     
+
     self.device = device
 
   @typechecked
-  def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8): 
+  def from_torch(grid:Grid, objects:TensorClass, grid_chunk=4): 
     return CountedGrid(grid, from_torch(objects), 
       grid_chunk,  device=objects.device)
-
-  # @ti.func
-  # def _query_grid(self, query:ti.template()):
-  #   ranges = self.grid.grid_ranges(query.bounds())
-
-  #   for cell in ti.grouped(ti.ndrange(*ranges)):
-  #       self._query_cell(cell, query)
-
 
   @ti.kernel
   def _count_objects(self, objects:ti.template()) -> ti.math.ivec2:
@@ -214,10 +210,13 @@ class CountedGrid:
       
       for cell in ti.grouped(ti.ndrange(*ranges)):
         box = self.grid.cell_bounds(cell)
+        chunk = cell // self.grid_chunk
 
         if obj.intersects_box(box):
           total_entries += 1
-          self.counts[cell.x, cell.y, cell.z] += 1
+          self.counts[cell.x, cell.y, cell.z][0] += 1
+
+          self.chunk_counts[chunk.x, chunk.y, chunk.z][0] += 1
 
     total_cells = 0
     
@@ -255,3 +254,24 @@ class CountedGrid:
 
     self._active_cells(cells, counts)
     return cells.to_torch(), counts
+
+
+  @ti.kernel
+  def _fill_index(self, prefix:ndarray(ti.i32, ndim=1), 
+    counts:ndarray(ti.i32, ndim=1), coords:ndarray(ivec3, ndim=1),
+    cell_index:ti.template(), index:ti.template()):
+
+    
+
+
+  def make_index(self):
+
+    coords, counts = self.active_cells()
+    index = ti.field(ti.i32, self.total_entries)
+
+    cell_index = ivec2.field()
+    sparse = block_bitmask(self.grid.size, self.grid_chunk)
+    sparse.place(cell_index)
+
+    self._fill_index(prefix, counts, coords, cell_index, index)
+    return GridIndex(self.grid, self.objects, cell_index, index)

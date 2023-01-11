@@ -21,7 +21,9 @@ def load_tree(filename:Path, radius_threshold=3.0):
   valid = np.flatnonzero((r > radius_threshold).reshape(-1))
 
   radii = np.zeros( (v.shape[0], 1) ) 
+  radii[edges[:, 1]] = r
   radii[edges[:, 0]] = r
+
 
 
   return Skeleton(
@@ -31,9 +33,12 @@ def load_tree(filename:Path, radius_threshold=3.0):
 
 
 def display_skeleton(skeleton:Skeleton):
+  r = skeleton.radii[skeleton.edges[:, 1]]
+  t = r / r.max()
 
-  skel = render.line_set(skeleton.points, skeleton.edges)
-  o3d.visualization.draw(skel)
+  colors = torch.stack([1.0 - t, t, torch.zeros_like(t)], dim=1)
+  return render.line_set(skeleton.points, skeleton.edges, colors=colors)
+
 
 
 

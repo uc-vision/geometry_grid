@@ -6,6 +6,7 @@ from typing import Tuple
 
 import taichi as ti
 import torch
+from geometry.taichi.types import AABox
 from geometry.torch.loading import display_skeleton, load_tree
 
 from geometry.taichi.grid import Grid
@@ -33,6 +34,7 @@ def display_densities(geom, boxes, counts, points):
     render.point_cloud(points, colors=colors)])
 
 
+
 if __name__ == "__main__":
   import argparse
   parser = argparse.ArgumentParser()
@@ -52,13 +54,15 @@ if __name__ == "__main__":
 
   device = torch.device(args.device)
 
-  skeleton = load_tree(args.filename, radius_threshold=0)
+  skeleton = load_tree(args.filename, radius_threshold=6)
   print("Extents: ", skeleton.bounds.extents)
 
-  segs = skeleton.tubes.segment.to(device)
+  tubes = skeleton.tubes.to(device)
 
   torch.manual_seed(0)  
-  points = torch_geom.around_tubes(skeleton.tubes, 1000000)
+  points = torch_geom.around_tubes(tubes, 1000000)
+
+
 
   print("Generate grid...")
   grid = CountedGrid.from_torch(
@@ -66,13 +70,11 @@ if __name__ == "__main__":
     # Grid.fixed_size(skeleton.bounds, (64, 64, 64)), 
     torch_geom.Point(points))
 
-
-
   print("Grid size: ", grid.grid.size)
   cells, counts = grid.active_cells()
 
 
-  skel = render.line_set(skeleton.points, skeleton.edges)
+  skel = display_skeleton(skeleton)
   display_densities([skel], grid.grid.get_boxes(cells), counts, points)
 
 

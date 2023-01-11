@@ -5,6 +5,11 @@ import torch
 import geometry.torch as torch_geom
 from typeguard import typechecked
 
+from open3d_vis import render
+import open3d as o3d
+
+from geometry.torch.types import dot
+
 
 @typechecked
 def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
@@ -14,15 +19,16 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   tubes = tubes[i]
   segments = tubes.segment
 
-  t = torch.rand(n, device=segments.device) 
-  radius = tubes.radius_at(t)
-
+  t = torch.rand((n,), device=segments.device) 
   p = torch.randn(n, 3, device=segments.device) * point_var
 
-  normal = torch.cross(torch.rand(n, 3, device=segments.device) - 0.5, segments[i].dir) 
-  r = radius.unsqueeze(-1) * (normal / torch.norm(normal, dim=1, keepdim=True))
+  d = segments.unit_dir
 
-  return segments[i].points_at(t) + p + r
+  v = torch.randn( (n, 3), device=segments.device)
+  v = v - dot(v, d).unsqueeze(-1) * d
+
+  r = v / torch.norm(v, dim=1, keepdim=True)
+  return segments.points_at(t) + r * tubes.radius_at(t).unsqueeze(1) + p
 
   
 
