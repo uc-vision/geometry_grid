@@ -10,7 +10,7 @@ from geometry.taichi.point_query import point_query
 from geometry.torch.loading import display_skeleton, load_tree
 
 from geometry.taichi.grid import Grid
-from geometry.taichi.object_grid import DynamicGrid
+from geometry.taichi.dynamic_grid import DynamicGrid
 from geometry.taichi.point_distances import min_distances, distances
 
 import geometry.torch as torch_geom

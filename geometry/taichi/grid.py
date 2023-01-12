@@ -14,7 +14,7 @@ import torch
 from geometry.taichi.types import AABox, Segment, Tube
 from .conversion import from_torch, torch_field
 
-
+from taichi.algorithms import parallel_sort
 
 
 @ti.func
@@ -31,6 +31,29 @@ def from_aabox(box:torch_geom.AABox):
   assert box.shape == ()
   l, u = [x.cpu().numpy() for x in [box.lower, box.upper]]
   return AABox(l, u)
+
+# https://stackoverflow.com/questions/
+# 1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints 
+@ti.func
+def spreads_bits32(x:ti.int32) -> ti.int32:
+  x &= 0x3ff
+  x = (x | (x << 16)) & 0x030000FF
+  x = (x | (x <<  8)) & 0x0300F00F
+  x = (x | (x <<  4)) & 0x030C30C3
+  x = (x | (x <<  2)) & 0x09249249
+  return x
+
+@ti.func
+def spreads_bits64(x:ti.int64) -> ti.int64:
+  x &= 0x1fffff
+  x = (x | (x << 32)) & 0x1f00000000ffff
+  x = (x | (x << 16)) & 0x1f0000ff0000ff
+  x = (x | (x << 8)) & 0x100f00f00f00f00f
+  x = (x | (x << 4)) & 0x10c30c30c30c30c3
+  x = (x | (x << 2)) & 0x1249249249249249
+  return x
+
+
 
 
 @ti.data_oriented
@@ -78,7 +101,8 @@ class Grid:
   @ti.func 
   def grid_cell(self, p:vec3) -> ivec3:
     lower, inc = self.get_inc()
-    return ti.cast((p - lower) / inc, ti.i32)
+    v = (p - lower) / inc
+    return ti.cast(clamp(v, 0, self.size - 1), ti.i32)
 
 
   @ti.func
@@ -107,6 +131,44 @@ class Grid:
     self._get_boxes(cells, boxes.lower, boxes.upper)
     return boxes
 
+  @ti.func
+  def cell_code64(self, cell:ivec3) -> ti.int64:
+    cell = ti.cast(cell, ti.int64)
+    return (spreads_bits64(cell.x) 
+      | (spreads_bits64(cell.y) << 1) 
+      | (spreads_bits64(cell.z) << 2))
+
+  @ti.func
+  def morton_code64(self, p:vec3) -> ti.int64:
+    cell = self.grid_cell(p)
+    return self.cell_code64(cell)
+
+
+  @ti.func
+  def cell_code32(self, cell:ivec3) -> ti.int32:
+    return (spreads_bits32(cell.x) 
+      | (spreads_bits32(cell.y) << 1) 
+      | (spreads_bits32(cell.z) << 2))
+
+  @ti.func
+  def morton_code32(self, p:vec3) -> ti.int32:
+    cell = self.grid_cell(p)
+    return self.cell_code32(cell)
+
+  @ti.kernel
+  def _code_points(self, points:ndarray(vec3, ndim=1), 
+    codes:ndarray(ti.int32, ndim=1)):
+    for i in range(points.shape[0]):
+      codes[i] = self.morton_code32(points[i])
+
+  def morton_argsort(self, points:torch.Tensor):
+    codes = torch.zeros(points.shape[0], dtype=torch.int32)
+    self._code_points(points, codes)
+    return torch.argsort(codes)
+
+  def morton_sort(self, points:torch.Tensor):
+    return points[self.morton_argsort(points)]
+    
 
 
 if __name__ == "__main__":

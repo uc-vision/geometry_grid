@@ -44,6 +44,10 @@ class Sphere(TensorClass):
   def render(self, colors=None):
     return render.spheres(self.center, self.radius, colors=colors) 
 
+  @property
+  def bounds(self):
+    return AABox(self.center - self.radius, self.center + self.radius)
+
 
 @dataclass 
 class Point(TensorClass):
@@ -51,6 +55,10 @@ class Point(TensorClass):
 
   def render(self, colors=None):
     return render.point_cloud(self.p, colors=colors) 
+
+  @property
+  def bounds(self):
+    return AABox(self.p, self.p)
 
 
 @dataclass
@@ -74,6 +82,22 @@ class AABox(TensorClass):
 
   def clamp(self, points:TensorType[..., 3, torch.float32]):
     return torch.clamp(points, self.lower, self.upper)
+
+  def union(self, other:'AABox'):
+    assert self.shape == other.shape, \
+      f"Cannot union boxes of different shapes: {self.shape} != {other.shape}"
+
+    return AABox(
+      self.lower.min(other.lower),
+      self.upper.max(other.upper)
+    )
+
+
+  def merge(self): 
+    return AABox(
+      self.lower.view(-1, 3).min(axis=0).values,
+      self.upper.view(-1, 3).max(axis=0).values
+    )
 
 
 @typechecked
@@ -109,6 +133,8 @@ class Hit(TensorClass):
   @cached_property
   def p2(self):
     return self.seg.a + self.t1 * self.seg.dir
+
+
 
 
 
@@ -163,11 +189,15 @@ class Segment(TensorClass):
 
   @cached_property
   def unit_dir(self):
-    return self.dir / self.length.unsqueeze(-1)
+    return self.dir / (self.length.unsqueeze(-1) + 1e-8)
 
   @cached_property
   def line(self):
     return Line(self.a, self.dir)
+
+  @property
+  def bounds(self):
+    return AABox(self.a, self.b)
 
   
   def segment_closest(self:'Segment', seg2:'Segment'):
@@ -209,7 +239,20 @@ class Tube(TensorClass):
   def radius_at(self, t):
     return self.radii[:, 0] + (self.radii[:, 1] - self.radii[:, 0]) * t
 
+  @property
+  def a(self):
+    return Sphere(self.segment.a, self.radii[:, 0])
 
+  @property
+  def b(self):
+    return Sphere(self.segment.b, self.radii[:, 0])
+
+
+  @property
+  def bounds(self):
+    return self.a.bounds.union(self.b.bounds,
+      self.b.bounds).union(
+        self.segment.bounds)
 
 if __name__=="__main__":
   # seg1 = Segment(torch.tensor([[0.0, -1.0, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)

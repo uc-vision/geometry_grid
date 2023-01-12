@@ -43,10 +43,9 @@ class Point:
     def bounds(self):
       return AABox(self.p, self.p)
 
-
     @ti.func 
     def point_distance(self, p:vec3):
-      return (p - self.center).norm()
+      return (p - self.p).norm()
 
 
 bvec3 = ti.types.vector(3, bool)

@@ -16,6 +16,7 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   i = torch.randint(low=0, high=tubes.shape[0] -1, 
     size=(int(n),), device=tubes.device)
 
+
   tubes = tubes[i]
   segments = tubes.segment
 
@@ -24,10 +25,11 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
 
   d = segments.unit_dir
 
+
   v = torch.randn( (n, 3), device=segments.device)
   v = v - dot(v, d).unsqueeze(-1) * d
 
-  r = v / torch.norm(v, dim=1, keepdim=True)
+  r = v / (torch.norm(v, dim=1, keepdim=True) + 1e-8)
   return segments.points_at(t) + r * tubes.radius_at(t).unsqueeze(1) + p
 
   
