@@ -1,6 +1,8 @@
+from dataclasses import asdict
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
+from geometry.taichi.field import block_bitmask, placed_field
 
 from geometry.taichi.grid import Grid
 from geometry.torch.dataclass import TensorClass
@@ -12,32 +14,32 @@ from taichi.types import ndarray
 
 
 
-
-def block_bitmask(size, chunk):
-    cell_blocks:ti.SNode = ti.root.bitmasked(ti.ijk, [1 + x//chunk for x in size])
-    return cell_blocks.bitmasked(ti.ijk, (chunk,chunk,chunk))
-
 @ti.data_oriented
 class GridIndex:
-  def __init__(self, grid:Grid, objects:ti.Field, cell_index:ti.Field, 
-    index:ti.ndarray):
-    
+  def __init__(self, grid:Grid, objects:ti.Field, total_entries:int, grid_chunk:int=8):
     self.grid = grid
 
     # Dense field of all objects
     self.objects = objects 
 
-    # Sparse field (ivec2) which contains the pair
-    # (index, count) which finds the entries in self.index
-    self.cell_index = cell_index
+    # Sparse fields which contains the pair
+    # (prefix, count) which points at ranges in self.index
+    self.sparse = block_bitmask(grid.size, grid_chunk)
+    self.prefix = placed_field(self.sparse, ti.int32)
+    self.count = placed_field(self.sparse, ti.int32)
 
-    # List of all object indexes in cells, ordered by cell
-    self.index = index 
+    # Flattened ragged lists of indexes into objects for each cell
+    self.index = ti.field(ti.i32, total_entries)
+    self.num_entries = total_entries
+  
+
+  def clear(self):
+    self.sparse.deactivate_all()
 
   @ti.func
   def _query_cell(self, cell:ivec3, query:ti.template()):
-    v = self.cell_index[cell] 
-    index, count = v.x, v.y
+    index = self.prefix[cell] 
+    count = self.count[cell] 
 
     for l in range(count):
       idx = self.index[index + l]
@@ -59,31 +61,40 @@ class GridIndex:
 class DynamicGrid:
   def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64, 
     grid_chunk=8, device='cuda:0'):
+
+    self.device = device
+    
     self.occupied = ti.field(ti.i32)
     self.grid_chunk=grid_chunk
     
     self.cells = block_bitmask(grid.size, grid_chunk)
-    lists = self.cells.dynamic(ti.l, max_occupied, chunk_size=8)
+    lists = self.cells.dynamic(ti.l, max_occupied, chunk_size=4)
     lists.place(self.occupied)
 
     self.grid = grid
     self.objects = objects
-    self.total_cells, self.total_entries = [
-      int(n) for n in self._add_objects(objects)]
+    self.index = None
+
+    self.add_objects()
     
-    self.device = device
+
 
   @typechecked
-  def from_torch(grid:Grid, objects:TensorClass, max_occupied=64): 
+  def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8, max_occupied=64): 
     return DynamicGrid(grid, from_torch(objects), 
-      max_occupied=max_occupied, device=objects.device)
+      max_occupied=max_occupied, device=objects.device, grid_chunk=grid_chunk)
 
-  @ti.func
-  def _query_grid(self, query:ti.template()):
-    ranges = self.grid.grid_ranges(query.bounds())
 
-    for cell in ti.grouped(ti.ndrange(*ranges)):
-        self._query_cell(cell, query)
+  def update_objects(self, objects:TensorClass):
+    self.objects.from_torch(asdict(objects))
+    self.cells.parent().deactivate_all()
+    self.add_objects()
+
+
+  def add_objects(self):
+    self.total_cells, self.total_entries = [
+      int(n) for n in self._add_objects(self.objects)]
+    self.update_index()
 
 
   @ti.kernel
@@ -103,45 +114,32 @@ class DynamicGrid:
     
     for _ in ti.grouped(self.cells):
       total_cells += 1
-
     return ti.math.vec2(total_cells, total_entries)
 
 
-  @ti.func
-  def _query_cell(self, cell:ivec3, query:ti.template()):
-    
-    for l in range(self.occupied[cell.x, cell.y, cell.z].length()):
-      idx = self.occupied[cell.x, cell.y, cell.z, l]
-      query.update(idx, self.objects[idx])
-
-
   @ti.kernel
-  def _active_cells(self, cells:ti.template(), 
+  def _active_cells(self, cells:ti.types.ndarray(ivec3, ndim=1), 
     counts:ti.types.ndarray(ti.i32, ndim=1)):
+    count = 0
 
-    for i in ti.grouped(self.cells):
-      cells.append(i)
-
-    for i in range(self.total_cells):
-      v = cells[i]
+    for cell in ti.grouped(self.cells):
+      i = ti.atomic_add(count, 1)
+      v = ivec3(cell)
+      cells[i] = v
       counts[i] = self.occupied[v.x, v.y, v.z].length()
 
 
 
   def active_cells(self) -> Tuple[torch.Tensor, torch.Tensor]:
-    cells = ivec3.field()
-    l = ti.root.dynamic(ti.i, self.total_cells, 
-      chunk_size=self.total_cells).place(cells)
-
+    cells = torch.zeros((self.total_cells, 3), device=self.device, dtype=torch.int32)
     counts = torch.zeros(self.total_cells, device=self.device, dtype=torch.int32)
 
     self._active_cells(cells, counts)
-    return cells.to_torch(), counts
+    return cells, counts
 
   @ti.kernel
-  def _fill_index(self, prefix:ndarray(ti.i32, ndim=1), 
-    counts:ndarray(ti.i32, ndim=1), coords:ndarray(ivec3, ndim=1),
-    cell_index:ti.template(), index:ti.template()):
+  def _fill_index(self, index:ti.template(), prefix:ndarray(ti.i32, ndim=1), counts:ndarray(ti.i32, ndim=1), 
+    coords:ndarray(ivec3, ndim=1), ):
 
     for i in range(self.total_cells):
       v = coords[i]
@@ -149,24 +147,26 @@ class DynamicGrid:
 
       for j in range(counts[i]):
         idx = self.occupied[v.x, v.y, v.z, j]
-        index[p + j] = idx
+        index.index[p + j] = idx
 
-      cell_index[v.x, v.y, v.z] = ivec2(p, counts[i])
+      index.prefix[v] = p
+      index.count[v] = counts[i]
 
 
-  def make_index(self):
+
+  def update_index(self):
+    if (self.index is None) or (self.total_entries > self.index.num_entries):
+      self.index = GridIndex(self.grid, self.objects, 
+        self.total_entries * 2, self.grid_chunk)
+    else:
+      self.index.clear()
 
     coords, counts = self.active_cells()
     prefix = torch.cumsum(counts, dim=0, dtype=torch.int32)
 
-    index = ti.field(ti.i32, self.total_entries)
+    self._fill_index(self.index, prefix, counts, coords)
 
-    cell_index = ivec2.field()
-    sparse = block_bitmask(self.grid.size, self.grid_chunk)
-    sparse.place(cell_index)
 
-    self._fill_index(prefix, counts, coords, cell_index, index)
-    return GridIndex(self.grid, self.objects, cell_index, index)
 
 
 

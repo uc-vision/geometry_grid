@@ -17,14 +17,10 @@ from .conversion import from_torch, torch_field
 from taichi.algorithms import parallel_sort
 
 
-@ti.func
-def point_bounds(points:ti.template()) -> AABox:
-  b = AABox(points[0], points[0])
+def point_bounds(points:torch.Tensor) -> torch_geom.AABox:
+  assert points.shape[1] == 3
+  return torch_geom.AABox(points.min(dim=0).values, points.max(dim=0).values)
 
-  for i in points:
-    b.lower = ti.math.min(b.lower, points[i])
-    b.upper = ti.math.max(b.upper, points[i])
-  return b
 
 
 def from_aabox(box:torch_geom.AABox):
@@ -54,7 +50,12 @@ def spreads_bits64(x:ti.int64) -> ti.int64:
   return x
 
 
-
+@typechecked
+def morton_sort(points:torch.Tensor, bounds=None, n=1024):
+  if bounds is None:
+    bounds = from_aabox(point_bounds(points))
+    
+  return Grid(bounds, ivec3(n)).morton_sort(points)
 
 @ti.data_oriented
 class Grid:
@@ -162,7 +163,7 @@ class Grid:
       codes[i] = self.morton_code32(points[i])
 
   def morton_argsort(self, points:torch.Tensor):
-    codes = torch.zeros(points.shape[0], dtype=torch.int32)
+    codes = torch.zeros(points.shape[0], dtype=torch.int32, device=points.device)
     self._code_points(points, codes)
     return torch.argsort(codes)
 

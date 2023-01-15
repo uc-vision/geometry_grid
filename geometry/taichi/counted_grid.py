@@ -1,6 +1,7 @@
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
+from geometry.taichi.field import placed_field
 
 from geometry.taichi.grid import Grid
 from geometry.torch.dataclass import TensorClass
@@ -12,10 +13,6 @@ from taichi.types import ndarray
 
 from .dynamic_grid import block_bitmask
 
-def placed_field(snode, dtype):
-  field = ti.field(dtype)
-  snode.place(field)
-  return field
 
 
 @ti.data_oriented

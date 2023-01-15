@@ -48,6 +48,9 @@ class Sphere(TensorClass):
   def bounds(self):
     return AABox(self.center - self.radius, self.center + self.radius)
 
+  def translate(self, d:TensorType[3, float]):
+    return Sphere(self.center + d, radius=self.radius)
+
 
 @dataclass 
 class Point(TensorClass):
@@ -59,6 +62,9 @@ class Point(TensorClass):
   @property
   def bounds(self):
     return AABox(self.p, self.p)
+
+  def translate(self, d:TensorType[3, float]):
+    return Point(self.p + d)
 
 
 @dataclass
@@ -82,6 +88,9 @@ class AABox(TensorClass):
 
   def clamp(self, points:TensorType[..., 3, torch.float32]):
     return torch.clamp(points, self.lower, self.upper)
+
+  def translate(self, d:TensorType[3, float]):
+    return AABox(self.lower + d, self.upper + d)
 
   def union(self, other:'AABox'):
     assert self.shape == other.shape, \
@@ -146,6 +155,9 @@ class Line(TensorClass):
   p: TensorType[3, float]
   dir: TensorType[3, float] 
 
+  def translate(self, d:TensorType[3, float]):
+    return Line(self.p + d, self.dir)
+
   def line_closest(line1:'Line', line2:'Line'):    
     v21 = line2.p - line1.p
       
@@ -198,6 +210,9 @@ class Segment(TensorClass):
   @property
   def bounds(self):
     return AABox(self.a, self.b)
+  
+  def translate(self, d:TensorType[3, float]):
+    return Segment(self.a + d, self.b + d)
 
   
   def segment_closest(self:'Segment', seg2:'Segment'):
@@ -238,6 +253,9 @@ class Tube(TensorClass):
 
   def radius_at(self, t):
     return self.radii[:, 0] + (self.radii[:, 1] - self.radii[:, 0]) * t
+
+  def translate(self, d:TensorType[3, float]):
+    return Tube(self.segment.translate(d), self.radii)
 
   @property
   def a(self):
