@@ -141,10 +141,11 @@ class DynamicGrid:
     return cells, counts
 
   @ti.kernel
-  def _fill_index(self, index:ti.template(), prefix:ndarray(ti.i32, ndim=1), counts:ndarray(ti.i32, ndim=1), 
+  def _fill_index(self,  index:ti.template(), prefix:ndarray(ti.i32, ndim=1), counts:ndarray(ti.i32, ndim=1), 
     coords:ndarray(ivec3, ndim=1)):
 
-    for i in range(self.total_cells):
+    print(counts.shape[0])
+    for i in range(counts.shape[0]):
       v = coords[i]
       # self.grid.assert_in_bounds(v)
 
