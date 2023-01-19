@@ -1,5 +1,6 @@
 
 
+import math
 from pathlib import Path
 
 import taichi as ti
@@ -22,6 +23,8 @@ from tqdm import tqdm
 from open3d_vis import render
 import open3d as o3d
 
+from geometry.torch.random import around_segments, random_segments, random_tubes
+
 
   
 def display_densities(geom, boxes, counts, points):
@@ -36,14 +39,15 @@ def display_densities(geom, boxes, counts, points):
     render.point_cloud(points, colors=colors)])
 
 
-def bench_query(name, grid, query_points, radius=5.0):
+def bench_query(name, grid_index, query_points, radius=0.2):
   print(f"Query {name}...")
   pbar = tqdm(range(100))
   for i in pbar:
     p = query_points + torch.randn_like(query_points) * i * 0.1
 
-    dist, idx = point_query(grid, torch_geom.Point(p), radius)
+    dist, idx = point_query(grid_index, torch_geom.Point(p), radius)
     pbar.set_description(f"n={(idx >= 0.0).sum().item()} query_radius={radius} noise={i * 0.1}")
+
 
 def bench_update_and_query(name, grid, points, radius):
   print(f"Update {name}...")
@@ -66,55 +70,44 @@ def main(args):
 
   device = torch.device(args.device)
 
-  skeleton = load_tree(args.filename, radius_threshold=0)
-  print("Extents: ", skeleton.bounds.extents)
-
-  tubes = skeleton.tubes.to(device)
-
   torch.manual_seed(0)  
-  points = torch_geom.around_tubes(tubes, 1000000)
+
+  segs = random_segments(torch_geom.AABox.from_to(-5, 5, device=device), n=int(math.sqrt(args.n)))
+  points = around_segments(segs, args.n, radius=0.2)
 
   points = morton_sort(points, n=256)
-  query_points = points + torch.randn_like(points) * 2.0
-
+  query_points = points + torch.randn_like(points) * 0.1
 
   point_objs = torch_geom.Point(points)
   bounds = point_objs.bounds.merge()
 
   grid = Grid.fixed_size(bounds, (64, 64, 64))
   
-  print("Generate grid...")
-  point_grid = CountedGrid.from_torch(grid, point_objs, grid_chunk=8)
+  # print("Generate grid...")
+  # point_grid = CountedGrid.from_torch(grid, point_objs, grid_chunk=8)
  
 
   print("Generate grid...")
   dyn_grid = DynamicGrid.from_torch(grid, point_objs, 
-    grid_chunk=8, max_occupied=128)
+    grid_chunk=8, max_occupied=256)
   
 
-  bench_update_and_query("Dynamic grid", dyn_grid, points, 5.0)
+  bench_update_and_query("Dynamic grid", dyn_grid, points, 0.2)
 
 
+  bench_query("Dynamic grid", dyn_grid.index, query_points)
+  # bench_query("Counted grid", point_grid, query_points)
 
-  bench_query("Dynamic grid", dyn_grid, query_points)
-  bench_query("Counted grid", point_grid, query_points)
-
-  # print("Grid size: ", point_grid.grid.size)
-  # cells, counts = point_grid.active_cells()
-
-
-  # skel = display_skeleton(skeleton)
-  # display_densities([skel], point_grid.grid.get_boxes(cells), counts, points)
-
-
-  # query_points = grid.morton_sort(
-  #     bounds.random_points(10000000))
+ 
 
 if __name__ == "__main__":
   import argparse
   parser = argparse.ArgumentParser()
-  parser.add_argument("filename", type=Path)
+  
   parser.add_argument("--debug", action="store_true")
+
+  parser.add_argument("--n", type=int, default=100000)
+
   parser.add_argument("--log", default=ti.INFO, choices=ti._logging.supported_log_levels)
 
   parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"])

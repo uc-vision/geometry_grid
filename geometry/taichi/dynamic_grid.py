@@ -55,8 +55,6 @@ class GridIndex:
 
 
 
-
-
 @ti.data_oriented
 class DynamicGrid:
   def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64, 
@@ -94,6 +92,8 @@ class DynamicGrid:
   def add_objects(self):
     self.total_cells, self.total_entries = [
       int(n) for n in self._add_objects(self.objects)]
+
+    print(self.total_cells, self.total_entries)
     self.update_index()
 
 
@@ -106,6 +106,8 @@ class DynamicGrid:
       
       for cell in ti.grouped(ti.ndrange(*ranges)):
         box = self.grid.cell_bounds(cell)
+        assert  self.grid.in_bounds(cell)
+
         if obj.intersects_box(box):
           total_entries += 1
           self.occupied[cell.x, cell.y, cell.z].append(l)
@@ -114,6 +116,7 @@ class DynamicGrid:
     
     for _ in ti.grouped(self.cells):
       total_cells += 1
+
     return ti.math.vec2(total_cells, total_entries)
 
 
@@ -126,8 +129,8 @@ class DynamicGrid:
       i = ti.atomic_add(count, 1)
       v = ivec3(cell)
       cells[i] = v
+      
       counts[i] = self.occupied[v.x, v.y, v.z].length()
-
 
 
   def active_cells(self) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -139,10 +142,12 @@ class DynamicGrid:
 
   @ti.kernel
   def _fill_index(self, index:ti.template(), prefix:ndarray(ti.i32, ndim=1), counts:ndarray(ti.i32, ndim=1), 
-    coords:ndarray(ivec3, ndim=1), ):
+    coords:ndarray(ivec3, ndim=1)):
 
     for i in range(self.total_cells):
       v = coords[i]
+      # self.grid.assert_in_bounds(v)
+
       p = ti.select(i > 0, prefix[i - 1], 0)
 
       for j in range(counts[i]):

@@ -16,7 +16,6 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   i = torch.randint(low=0, high=tubes.shape[0] -1, 
     size=(int(n),), device=tubes.device)
 
-
   tubes = tubes[i]
   segments = tubes.segment
 
@@ -25,7 +24,6 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
 
   d = segments.unit_dir
 
-
   v = torch.randn( (n, 3), device=segments.device)
   v = v - dot(v, d).unsqueeze(-1) * d
 
@@ -33,8 +31,12 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   return segments.points_at(t) + r * tubes.radius_at(t).unsqueeze(1) + p
 
   
+@typechecked
+def around_segments(segments:torch_geom.Segment, n:int, radius:float, point_var:float = 0.01):
+  tubes = torch_geom.Tube(segments, torch.full((segments.shape[0], 2), radius, device=segments.device))
+  return around_tubes(tubes, n, point_var=point_var)
 
-def random_segments(bounds:torch_geom.AABox, 
+def random_segments(bounds:torch_geom.AABox,
   length_range:Tuple[float, float]=(0.5, 2.0), n:int=100):
 
   lengths = torch.rand(n, device=bounds.device) * \
@@ -46,3 +48,11 @@ def random_segments(bounds:torch_geom.AABox,
 
   return torch_geom.Segment(points, 
     bounds.clamp(points + directions * lengths.unsqueeze(1)))
+
+
+
+def random_tubes(segments:torch_geom.Segment, radius_range:Tuple[float, float]=(0.1, 0.25), n:int=100):
+  radii = torch.rand(n, 2, device=segments.device) * radius_range[1] + radius_range[0]
+
+  return torch_geom.Tube(segments, radii)
+

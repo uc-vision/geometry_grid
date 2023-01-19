@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+from numbers import Number
 import numpy as np
 
 from open3d_vis import render
@@ -72,6 +73,12 @@ class AABox(TensorClass):
   """An axis aligned bounding box in 3D space."""
   lower: TensorType[3, float]
   upper: TensorType[3, float] 
+
+  @staticmethod
+  def from_to(lower:Number, upper:Number, device:torch.device):
+    lower = torch.tensor([lower, lower, lower], dtype=torch.float32, device=device)
+    upper = torch.tensor([upper, upper, upper],  dtype=torch.float32, device=device)
+    return AABox(lower, upper)
 
   def expand(self, d:float):
     return AABox(self.lower - d, self.upper + d)

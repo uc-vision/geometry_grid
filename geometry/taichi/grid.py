@@ -115,6 +115,12 @@ class Grid:
   def in_bounds(self, cell:ivec3) -> bool:
     return (0 <= cell).all() and (cell < self.size).all()
 
+  @ti.func
+  def assert_in_bounds(self, v:ivec3):
+    s = self.size
+    assert  self.in_bounds(v), f"{v.x} {v.y} {v.z} not in {s.x} {s.y} {s.z}"
+
+
   @ti.kernel
   def _get_boxes(self, cells:ndarray(ivec3, ndim=1),
     lower:ndarray(vec3, ndim=1), 
