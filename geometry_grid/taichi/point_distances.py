@@ -2,10 +2,10 @@ import taichi as ti
 from taichi.types import ndarray
 import torch
 
-from geometry.torch.random import random_segments
+from geometry_grid.torch.random import random_segments
 
 from ..torch.dataclass import TensorClass
-from geometry.taichi.conversion import from_torch
+from geometry_grid.taichi.conversion import from_torch
 
 from taichi.math import vec3
 
@@ -74,7 +74,7 @@ def distances(objects:TensorClass, points:torch.Tensor):
 
 
 if __name__ == "__main__":
-  from geometry.torch.types import AABox
+  from geometry_grid.torch.types import AABox
 
   x = random_segments(AABox(torch.tensor([-10.0, -10.0, -10.0]),
     torch.tensor([10.0, 10.0, 10.0])), n=10)

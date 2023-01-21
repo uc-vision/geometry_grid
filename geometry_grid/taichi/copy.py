@@ -1,17 +1,17 @@
 
-from geometry.taichi.point_distances import _min_distances
+from geometry_grid.taichi.point_distances import _min_distances
 import taichi as ti
 from taichi.types import ndarray
 from taichi.math import vec3
 
-import geometry.torch as torch_geom
+import geometry_grid.torch as torch_geom
 
 import torch
 
-from geometry.torch.random import random_segments
+from geometry_grid.torch.random import random_segments
 
-from geometry.torch.dataclass import TensorClass
-from geometry.taichi.conversion import from_torch
+from geometry_grid.torch.dataclass import TensorClass
+from geometry_grid.taichi.conversion import from_torch
 
 
 

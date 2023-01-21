@@ -7,11 +7,11 @@ from taichi.types import ndarray
 import numpy as np
 
 from geometry import torch as torch_geom
-from geometry.torch.dataclass import TensorClass
+from geometry_grid.torch.dataclass import TensorClass
 from typeguard import typechecked
 
 import torch
-from geometry.taichi.types import AABox, Segment, Tube
+from geometry_grid.taichi.types import AABox, Segment, Tube
 from .conversion import from_torch, torch_field
 
 from taichi.algorithms import parallel_sort

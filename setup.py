@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-setup(name='python_geometry',
+setup(name='geometry_grids',
       version='0.1',
       install_requires=[
           'natsort', 

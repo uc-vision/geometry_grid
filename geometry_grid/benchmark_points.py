@@ -6,24 +6,24 @@ from pathlib import Path
 import taichi as ti
 from taichi.math import vec3
 import torch
-from geometry.taichi.dynamic_grid import DynamicGrid
-from geometry.taichi.types import AABox
-from geometry.torch.loading import display_skeleton, load_tree
+from geometry_grid.taichi.dynamic_grid import DynamicGrid
+from geometry_grid.taichi.types import AABox
+from geometry_grid.torch.loading import display_skeleton, load_tree
 
-from geometry.taichi.grid import Grid, morton_sort
-from geometry.taichi.counted_grid import CountedGrid
+from geometry_grid.taichi.grid import Grid, morton_sort
+from geometry_grid.taichi.counted_grid import CountedGrid
 
-from geometry.taichi.point_query import point_query
+from geometry_grid.taichi.point_query import point_query
 
 
-import geometry.torch as torch_geom
+import geometry_grid.torch as torch_geom
 from tqdm import tqdm
 
 
 from open3d_vis import render
 import open3d as o3d
 
-from geometry.torch.random import around_segments, random_segments, random_tubes
+from geometry_grid.torch.random import around_segments, random_segments, random_tubes
 
 
   
@@ -39,11 +39,11 @@ def display_densities(geom, boxes, counts, points):
     render.point_cloud(points, colors=colors)])
 
 
-def bench_query(name, grid_index, query_points, radius=0.2):
+def bench_query(name, grid_index, query_points, radius=0.2, n=100):
   print(f"Query {name}...")
-  pbar = tqdm(range(100))
+  pbar = tqdm(range(n))
   for i in pbar:
-    p = query_points + torch.randn_like(query_points) * i * 0.1
+    p = query_points + torch.randn_like(query_points) * i * (radius / n)
 
     dist, idx = point_query(grid_index, torch_geom.Point(p), radius)
     pbar.set_description(f"n={(idx >= 0.0).sum().item()} query_radius={radius} noise={i * 0.1}")
@@ -105,11 +105,8 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   
   parser.add_argument("--debug", action="store_true")
-
   parser.add_argument("--n", type=int, default=100000)
-
   parser.add_argument("--log", default=ti.INFO, choices=ti._logging.supported_log_levels)
-
   parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"])
 
   args = parser.parse_args()

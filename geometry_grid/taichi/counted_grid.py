@@ -1,17 +1,18 @@
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
-from geometry.taichi.field import placed_field
+from geometry_grid.taichi.field import placed_field
 
-from geometry.taichi.grid import Grid
-from geometry.torch.dataclass import TensorClass
+from geometry_grid.taichi.grid import Grid
+from geometry_grid.torch.dataclass import TensorClass
 from typeguard import typechecked
 
 import torch
 from .conversion import from_torch
 from taichi.types import ndarray
 
-from .dynamic_grid import block_bitmask
+from .dynamic_grid import block_bitmask, GridIndex
+
 
 
 
@@ -32,7 +33,8 @@ class CountedGrid:
     
     self.chunk_counts = placed_field(self.chunks, ti.i32)
     self.chunk_prefix = placed_field(self.chunks, ti.i32)
-    cell_index = placed_field(self.cells, ti.i32)
+    
+    self.current_index = placed_field(self.cells, ti.i32)
 
     self.total_cells, self.total_entries = [
       int(n) for n in self._count_objects()]
@@ -40,7 +42,7 @@ class CountedGrid:
     self._compute_prefixes()
 
     self.index = ti.field(ti.i32, self.total_entries)
-    self._fill_index(cell_index)
+    self._fill_index()
 
     self.device = device
 
@@ -73,11 +75,11 @@ class CountedGrid:
 
 
   @ti.kernel
-  def _fill_index(self, current_index:ti.template()):
+  def _fill_index(self):
 
     # Initialise index with the prefix sum
     for cell in ti.grouped(self.cells):
-      current_index[cell] = self.prefix[cell]
+      self.current_index[cell] = self.prefix[cell]
 
     for l in range(self.objects.shape[0]):
       ranges = self.grid.grid_ranges(self.objects[l].bounds())
@@ -86,7 +88,7 @@ class CountedGrid:
         box = self.grid.cell_bounds(cell)
         if self.objects[l].intersects_box(box):
           # Increment pointer and add object to the index
-          index_loc = ti.atomic_add(current_index[cell], 1)
+          index_loc = ti.atomic_add(self.current_index[cell], 1)
           self.index[index_loc] = l
 
     

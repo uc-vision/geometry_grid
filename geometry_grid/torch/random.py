@@ -2,13 +2,13 @@
 from typing import Tuple
 import torch
 
-import geometry.torch as torch_geom
+import geometry_grid.torch as torch_geom
 from typeguard import typechecked
 
 from open3d_vis import render
 import open3d as o3d
 
-from geometry.torch.types import dot
+from geometry_grid.torch.types import dot
 
 
 @typechecked

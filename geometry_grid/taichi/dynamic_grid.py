@@ -2,10 +2,10 @@ from dataclasses import asdict
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
-from geometry.taichi.field import block_bitmask, placed_field
+from geometry_grid.taichi.field import block_bitmask, placed_field
 
-from geometry.taichi.grid import Grid
-from geometry.torch.dataclass import TensorClass
+from geometry_grid.taichi.grid import Grid
+from geometry_grid.torch.dataclass import TensorClass
 from typeguard import typechecked
 
 import torch
@@ -93,7 +93,6 @@ class DynamicGrid:
     self.total_cells, self.total_entries = [
       int(n) for n in self._add_objects(self.objects)]
 
-    print(self.total_cells, self.total_entries)
     self.update_index()
 
 
@@ -147,7 +146,6 @@ class DynamicGrid:
     print(counts.shape[0])
     for i in range(counts.shape[0]):
       v = coords[i]
-      # self.grid.assert_in_bounds(v)
 
       p = ti.select(i > 0, prefix[i - 1], 0)
 

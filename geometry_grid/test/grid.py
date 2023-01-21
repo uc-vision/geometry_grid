@@ -5,13 +5,13 @@ import torch
 
 import taichi as ti
 
-from geometry.taichi.grid import ObjectGrid
-from geometry.taichi.point_distances import min_distances, distances
+from geometry_grid.taichi.grid import ObjectGrid
+from geometry_grid.taichi.point_distances import min_distances, distances
 
-import geometry.torch as torch_geom
+import geometry_grid.torch as torch_geom
 
 from typeguard import typechecked
-from geometry.torch.random import around_segments, random_segments
+from geometry_grid.torch.random import around_segments, random_segments
 
 
 

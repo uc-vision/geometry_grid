@@ -5,11 +5,11 @@ import taichi as ti
 import torch
 from typeguard import typechecked
 
-from geometry.torch.dataclass import TensorClass
+from geometry_grid.torch.dataclass import TensorClass
 from py_structs.torch import shape
 
-import geometry.torch.types as torch_geom
-import geometry.taichi.types as ti_geom
+import geometry_grid.torch.types as torch_geom
+import geometry_grid.taichi.types as ti_geom
 
 torch_taichi = {
     torch.float32: ti.f32,

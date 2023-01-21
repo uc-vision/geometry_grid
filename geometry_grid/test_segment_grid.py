@@ -6,14 +6,14 @@ from typing import Tuple
 
 import taichi as ti
 import torch
-from geometry.taichi.point_query import point_query
-from geometry.torch.loading import display_skeleton, load_tree
+from geometry_grid.taichi.point_query import point_query
+from geometry_grid.torch.loading import display_skeleton, load_tree
 
-from geometry.taichi.grid import Grid
-from geometry.taichi.dynamic_grid import DynamicGrid
-from geometry.taichi.point_distances import min_distances, distances
+from geometry_grid.taichi.grid import Grid
+from geometry_grid.taichi.dynamic_grid import DynamicGrid
+from geometry_grid.taichi.point_distances import min_distances, distances
 
-import geometry.torch as torch_geom
+import geometry_grid.torch as torch_geom
 from tqdm import tqdm
 
 
