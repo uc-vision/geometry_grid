@@ -1,17 +1,25 @@
 from dataclasses import InitVar, asdict, dataclass, field, fields
 from numbers import Number
 import typing
-from typing import Optional
-from torchtyping import patch_typeguard, ShapeDetail, DtypeDetail
+from typing import Generic, Optional, TypeVar
 from typeguard import typechecked
+import typing_inspect
+
 
 import torch
 
 from py_structs.torch import shape
 from py_structs import struct
 
+from beartype import beartype
 
-patch_typeguard()
+
+from jaxtyping import Float, Int, jaxtyped
+
+
+from tensordict.prototype import tensorclass
+from torch import Tensor
+from jaxtyping.array_types import _FixedDim, _check_dims
 
 
 def annotation_details(t):
@@ -19,113 +27,69 @@ def annotation_details(t):
     d = t.__metadata__[0]
     if '__torchtyping__' in d:
       return d['details']
-  
-@dataclass
-class TensorAnnotation:
-  shape: ShapeDetail
-  dtype: Optional[DtypeDetail]
 
 
-
-def annot_info(t) -> Optional[TensorAnnotation]:
-  details = annotation_details(t)
-  dtype = None
-
-  if details is not None:
-    shape = ShapeDetail(dims=[], check_names=False)
-
-    for d in details:
-      if isinstance(d, ShapeDetail):
-        shape = d
-      elif isinstance(d, DtypeDetail):
-        dtype = d
-
-    return TensorAnnotation(shape, dtype)
-
-      
-
-def check_shape(name:str, sd:ShapeDetail, v:torch.Tensor):
-
-  n = len(sd.dims)
-  prefix, suffix = v.shape[:len(v.shape) - n], v.shape[len(v.shape) - n:]
-
-  fake = struct(shape=v.shape[-n:], names=[None] * n)
-  if not sd.check(fake):
-    raise TypeError(f"Expected {name} to have shape {sd.dims}, got {v.shape}")
-    
-  return prefix, suffix
-  
-def check_dtype(name, dtype, v, convert=False):
-  if dtype is not None:
-    if not dtype.check(v):
-      if convert:
-        return v.to(dtype.dtype)
-      else:
-        raise TypeError(f"Expected {name} to have dtype {dtype.dtype}, got {v.dtype}")
-
-  return v
+N = TypeVar("N")
 
 @dataclass(kw_only=True, repr=False)
-class TensorClass():
+class TensorClass(Generic[N]):
   # Broadcast prefixes shapes together
   broadcast:  InitVar[bool] = False   
 
-  # Convert to annotated datatypes rather than throw TypeError
-  convert_types: InitVar[bool] = False  
-
-  @classmethod
-  def annot_info(cls):
-    return {f.name:annot_info(f) for f in fields(cls)}      
-    
-
-  def __post_init__(self, broadcast, convert_types):
-    prefix, shapes = {}, {}
+  def __post_init__(self, broadcast):
+    memo = {}
+    variadic_memo = {}
+    variadic_broadcast_memo = {}
 
     self.device = None
     for f in fields(self):
       value = getattr(self, f.name)
       
       if isinstance(value, torch.Tensor):
-        annot = annot_info(f.type)
+        f.type._check_shape(value, single_memo=memo, variadic_memo=variadic_memo, variadic_broadcast_memo=variadic_broadcast_memo)
+        
+      if isinstance(value, TensorClass):
+        pass
+        
 
-        if annot is None or annot.shape is None:
-          raise TypeError(f"Tensor field '{f.name}' must have a shape annotation")
+    #     if annot is None or annot.shape is None:
+    #       raise TypeError(f"Tensor field '{f.name}' must have a shape annotation")
 
-        prefix[f.name], shapes[f.name] = check_shape(f.name, annot.shape, value)
-        value = check_dtype(f.name, annot.dtype, value, convert_types)
-        setattr(self, f.name, value)
+    #     prefix[f.name], shapes[f.name] = check_shape(f.name, annot.shape, value)
+    #     value = check_dtype(f.name, annot.dtype, value, convert_types)
+    #     setattr(self, f.name, value)
 
-        if self.device is not None and self.device != value.device:
-          raise TypeError(f"Expected all tensors to have the same dtype, got {self.device} and {value.device}")
-        self.device = value.device
+    #     if self.device is not None and self.device != value.device:
+    #       raise TypeError(f"Expected all tensors to have the same dtype, got {self.device} and {value.device}")
+    #     self.device = value.device
 
 
-      elif isinstance(value, TensorClass):
-        prefix[f.name] = value.shape
-        shapes[f.name] = value.shapes
+    #   elif isinstance(value, TensorClass):
+    #     prefix[f.name] = value.shape
+    #     shapes[f.name] = value.shapes
     
-    if broadcast:
-      try:
-        prefix = torch.broadcast_shapes(*prefix.values())
-        for k, sh in shapes.items():
-          value = getattr(self, k)
-          if isinstance(value, TensorClass):
-            setattr(self, k, value.expand(self.prefix))
-          else:
-            setattr(self, k, value.expand(self.prefix + sh))
+    # if broadcast:
+    #   try:
+    #     prefix = torch.broadcast_shapes(*prefix.values())
+    #     for k, sh in shapes.items():
+    #       value = getattr(self, k)
+    #       if isinstance(value, TensorClass):
+    #         setattr(self, k, value.expand(self.prefix))
+    #       else:
+    #         setattr(self, k, value.expand(self.prefix + sh))
 
-      except RuntimeError as e:
-        raise TypeError(f"Could not broadcast shapes {prefix}") from e
-    else:
-      prefixes = set(prefix.values())
-      if len(prefixes) != 1:
-        raise TypeError(
-            f"Expected all tensors to have the same prefix, got: {prefix}")
+    #   except RuntimeError as e:
+    #     raise TypeError(f"Could not broadcast shapes {prefix}") from e
+    # else:
+    #   prefixes = set(prefix.values())
+    #   if len(prefixes) != 1:
+    #     raise TypeError(
+    #         f"Expected all tensors to have the same prefix, got: {prefix}")
 
-      prefix = prefixes.pop()
+    #   prefix = prefixes.pop()
 
-    self.shape = prefix
-    self.shapes = shapes
+    # self.shape = prefix
+    # self.shapes = shapes
 
   @property 
   def shape_info(self):
@@ -204,3 +168,36 @@ class TensorClass():
   def __repr__(self):
     name= self.__class__.__name__
     return f"{name}({shape(asdict(self))})"
+
+@jaxtyped
+@beartype
+@dataclass
+class T(TensorClass):
+  a: Float[Tensor, "*#N 3"]
+  b: Int[Tensor, "*#N 3"]
+  c: str
+
+
+@jaxtyped
+@beartype
+@dataclass
+class F(TensorClass):
+  a: T
+  b: Int[Tensor, "*#N 3"]
+  c: str
+
+
+# T.__init__ = jaxtyped(T.__init__)
+
+@jaxtyped
+@beartype
+def test_foo(a: Float[Tensor, "N 3"], b: Int[Tensor, "N 3"]):
+  pass
+
+if __name__ == "__main__":
+
+  print(T.__init__.__annotations__)
+  t = T(a=torch.randn(5, 1,3), b=torch.randn(5, 7,3).to(torch.long), c = "hello")
+  f = F(a=t, b=torch.randn(1, 7,3).to(torch.long), c = "hello")
+
+  # print(test_foo(t.a, t.b))
