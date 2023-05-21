@@ -1,22 +1,42 @@
 from dataclasses import dataclass
 from functools import cached_property
 from numbers import Number
+from beartype import beartype
 import numpy as np
 
 from open3d_vis import render
-from .dataclass import TensorClass, dataclass
 from typeguard import typechecked
 
-from torchtyping import TensorType
+from tensorclass import TensorClass
+
+from jaxtyping import Float32, Int32, Bool, jaxtyped
 import torch
 
+def typechecked(f):
+  return beartype(jaxtyped(f))
+
+Vec3 = Float32[torch.Tensor, '3']  
+Vec2 = Float32[torch.Tensor, '2']
+Vec1 = Float32[torch.Tensor, '1']
+
+NVec1 = Float32[torch.Tensor, '*N 1']  
+NVec2 = Float32[torch.Tensor, '*N 2']  
+NVec3 = Float32[torch.Tensor, '*N 3']  
+NVec4 = Float32[torch.Tensor, '*N 4']  
+NVec5 = Float32[torch.Tensor, '*N 5']  
+NVec6 = Float32[torch.Tensor, '*N 6']  
+
+
+NVec = Float32[torch.Tensor, '*N']  
+
+
+@jaxtyped
 @dataclass 
 class Skeleton: 
 
-
-  points: TensorType['N', 3, float]  
-  radii: TensorType['N', 1, float]
-  edges: TensorType['M', 2, torch.long]  
+  points: Float32[torch.Tensor, 'N 3']  
+  radii: Float32[torch.Tensor, 'N 1']
+  edges: Int32[torch.Tensor, 'M 2']  
 
   @property
   def bounds(self):
@@ -36,11 +56,12 @@ class Skeleton:
         self.radii[self.edges[:, 1]]], dim=-1).squeeze(1)
     
     return Tube(segment=self.segments, radii=radii)
+  
 
-@dataclass 
+@dataclass(repr=False)
 class Sphere(TensorClass):
-  center: TensorType[3, float]
-  radius: TensorType[float]
+  center: Vec3
+  radius: Vec1
 
   def render(self, colors=None):
     return render.spheres(self.center, self.radius, colors=colors) 
@@ -49,13 +70,14 @@ class Sphere(TensorClass):
   def bounds(self):
     return AABox(self.center - self.radius, self.center + self.radius)
 
-  def translate(self, d:TensorType[3, float]):
+  @jaxtyped
+  def translate(self, d:Vec3):
     return Sphere(self.center + d, radius=self.radius)
 
 
-@dataclass 
+@dataclass(repr=False)
 class Point(TensorClass):
-  p: TensorType[3, float]
+  p: Vec3
 
   def render(self, colors=None):
     return render.point_cloud(self.p, colors=colors) 
@@ -64,21 +86,26 @@ class Point(TensorClass):
   def bounds(self):
     return AABox(self.p, self.p)
 
-  def translate(self, d:TensorType[3, float]):
+  def translate(self, d:Vec3):
     return Point(self.p + d)
+  
 
-
-@dataclass
+@dataclass(repr=False)
 class AABox(TensorClass):
   """An axis aligned bounding box in 3D space."""
-  lower: TensorType[3, float]
-  upper: TensorType[3, float] 
+  lower: Vec3
+  upper: Vec3 
 
   @staticmethod
   def from_to(lower:Number, upper:Number, device:torch.device):
     lower = torch.tensor([lower, lower, lower], dtype=torch.float32, device=device)
     upper = torch.tensor([upper, upper, upper],  dtype=torch.float32, device=device)
     return AABox(lower, upper)
+
+  @typechecked
+  @staticmethod
+  def from_points(points:Float32[torch.Tensor, '*M N 3']):
+    return AABox(points.min(axis=-2).values, points.max(axis=-2).values)
 
   def expand(self, d:float):
     return AABox(self.lower - d, self.upper + d)
@@ -93,10 +120,14 @@ class AABox(TensorClass):
   def random_points(self, n:int):
     return torch.rand(n, 3, device=self.device) * self.extents + self.lower
 
-  def clamp(self, points:TensorType[..., 3, torch.float32]):
+  @typechecked
+  def clamp(self, points:NVec3):
     return torch.clamp(points, self.lower, self.upper)
+  
 
-  def translate(self, d:TensorType[3, float]):
+
+  @typechecked
+  def translate(self, d:Vec3):
     return AABox(self.lower + d, self.upper + d)
 
   def union(self, other:'AABox'):
@@ -117,7 +148,7 @@ class AABox(TensorClass):
 
 
 @typechecked
-def voxel_grid(lower:TensorType[3], upper:TensorType[3], voxel_size:float) -> AABox:
+def voxel_grid(lower:Vec3, upper:Vec3, voxel_size:float) -> AABox:
   extents = upper - lower
   grid_size = np.ceil(extents / voxel_size).to(torch.long)
 
@@ -131,15 +162,14 @@ def voxel_grid(lower:TensorType[3], upper:TensorType[3], voxel_size:float) -> AA
     upper = (offset + (xyz + 1) * voxel_size),
   )
 
-
-@dataclass()
+@dataclass(repr=False)
 class Hit(TensorClass):
   seg : 'Segment'
-  t1 : TensorType[float]
-  t2 : TensorType[float]
+  t1 : Vec1
+  t2 : Vec1
 
   @property
-  def valid(self) -> TensorType[..., bool]:
+  def valid(self) -> Bool[torch.Tensor, '*N']:
     return (self.t1 <= self.t2) & (self.t1 <= 1) & (self.t2 >= 0)
 
   @cached_property
@@ -152,17 +182,16 @@ class Hit(TensorClass):
 
 
 
-
-
 def dot(a, b):
   return torch.einsum('...d,...d->...', a, b)
 
-@dataclass()
+@dataclass(repr=False)
 class Line(TensorClass):
-  p: TensorType[3, float]
-  dir: TensorType[3, float] 
+  p: Vec3
+  dir: Vec3
 
-  def translate(self, d:TensorType[3, float]):
+  @typechecked
+  def translate(self, d:Vec3):
     return Line(self.p + d, self.dir)
 
   def line_closest(line1:'Line', line2:'Line'):    
@@ -191,12 +220,11 @@ class Line(TensorClass):
 
     return s, t
 
-
-@dataclass()
+@dataclass(repr=False)
 class Segment(TensorClass):
   """Line segment between two points."""
-  a: TensorType[3, float]
-  b: TensorType[3, float] 
+  a: Vec3
+  b: Vec3 
 
   @property
   def length(self):
@@ -218,7 +246,7 @@ class Segment(TensorClass):
   def bounds(self):
     return AABox(self.a, self.b)
   
-  def translate(self, d:TensorType[3, float]):
+  def translate(self, d:Vec3):
     return Segment(self.a + d, self.b + d)
 
   
@@ -228,7 +256,7 @@ class Segment(TensorClass):
 
   def segment_distance(self, seg2:'Segment'):
     s, t = self.segment_closest(seg2)
-    p1, p2 = self.points(s), seg2.points(t)
+    p1, p2 = self.points_at(s), seg2.points_at(t)
 
     return torch.norm(p1 - p2, dim=-1)
 
@@ -246,22 +274,21 @@ class Segment(TensorClass):
 
     return Hit(seg, t1, t2)
 
-  def points_at(self, t:TensorType[..., float]):
+  def points_at(self, t:NVec):
     return self.a + (self.b - self.a) * t.unsqueeze(-1)
 
 
 
-
-@dataclass
+@dataclass(repr=False)
 class Tube(TensorClass):
   """Line segment between two points."""
   segment: Segment
-  radii: TensorType[2, float]
+  radii: Vec2
 
   def radius_at(self, t):
     return self.radii[:, 0] + (self.radii[:, 1] - self.radii[:, 0]) * t
 
-  def translate(self, d:TensorType[3, float]):
+  def translate(self, d:Vec3):
     return Tube(self.segment.translate(d), self.radii)
 
   @property
@@ -280,15 +307,20 @@ class Tube(TensorClass):
         self.segment.bounds)
 
 if __name__=="__main__":
-  # seg1 = Segment(torch.tensor([[0.0, -1.0, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)
-  # seg2 = Segment(torch.tensor([[0.0, 0.0, -1.0]]), torch.tensor([[1.0, 0.0, 1.0]]), convert_types=True)
-
+  seg1 = Segment(torch.tensor([[0.0, -1.0, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)
+  seg2 = Segment(torch.tensor([[0.0, 0.0, -1.0]]), torch.tensor([[1.0, 0.0, 1.0]]), convert_types=True)
   
-  # d = seg1.segment_distance(seg2)
-  # print(d)
+  print(seg1)
+  d = seg1.segment_distance(seg2)
+  print(d)
   
   seg1 = Segment(torch.tensor([[0.0, 0.1, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)
   seg2 = Segment(torch.tensor([[0.0, 0.0, 0.1]]), torch.tensor([[0.0, 0.0, 1.0]]), convert_types=True)
 
   d = seg1.line.line_closest(seg2.line)
   print(d)
+
+  points = torch.randn(17, 10, 3)
+  box = AABox.from_points(points)
+
+  print(box.shape, box.batch_shape)

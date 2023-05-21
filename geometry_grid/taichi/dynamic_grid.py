@@ -5,7 +5,6 @@ from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi.field import block_bitmask, placed_field
 
 from geometry_grid.taichi.grid import Grid
-from geometry_grid.torch.dataclass import TensorClass
 from typeguard import typechecked
 
 import torch
