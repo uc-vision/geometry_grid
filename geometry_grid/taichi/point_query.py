@@ -4,7 +4,7 @@ from taichi.math import vec3
 from taichi.types import ndarray
 import torch
 
-from .types import AABox
+from .geometry_types import AABox
 
 
 @ti.dataclass

@@ -5,11 +5,11 @@ setup(name='geometry_grids',
       install_requires=[
           'natsort', 
           'cached-property', 
-          'typeguard',
+          'jaxtyping',
+          'beartype',
           'py-structs>=1.1.0',
           'open3d_vis',
-          'taichi',
-          'torchtyping',
+          'taichi-nightly',
 
           # Testing related
           'pytest',

@@ -7,7 +7,7 @@ from typing import Tuple
 import taichi as ti
 import torch
 from geometry_grid.taichi.point_query import point_query
-from geometry_grid.torch.loading import display_skeleton, load_tree
+from geometry_grid.skeleton.loading import display_skeleton, load_tree
 
 from geometry_grid.taichi.grid import Grid
 from geometry_grid.taichi.dynamic_grid import DynamicGrid

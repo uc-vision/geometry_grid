@@ -1,26 +1,19 @@
-import dataclasses
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, clamp
 from taichi.types import ndarray
 
-import numpy as np
 
-from geometry import torch as torch_geom
-from geometry_grid.torch.dataclass import TensorClass
+from geometry_grid import torch as torch_geom
 from typeguard import typechecked
 
 import torch
-from geometry_grid.taichi.types import AABox, Segment, Tube
-from .conversion import from_torch, torch_field
-
-from taichi.algorithms import parallel_sort
+from geometry_grid.taichi.geometry_types import AABox, Segment, Tube
 
 
 def point_bounds(points:torch.Tensor) -> torch_geom.AABox:
   assert points.shape[1] == 3
   return torch_geom.AABox(points.min(dim=0).values, points.max(dim=0).values)
-
 
 
 def from_aabox(box:torch_geom.AABox):

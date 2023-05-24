@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
 from numbers import Number
-from beartype import beartype
 import numpy as np
 
 from open3d_vis import render
@@ -9,54 +8,13 @@ from typeguard import typechecked
 
 from tensorclass import TensorClass
 
-from jaxtyping import Float32, Int32, Bool, jaxtyped
 import torch
-
-def typechecked(f):
-  return beartype(jaxtyped(f))
-
-Vec3 = Float32[torch.Tensor, '3']  
-Vec2 = Float32[torch.Tensor, '2']
-Vec1 = Float32[torch.Tensor, '1']
-
-NVec1 = Float32[torch.Tensor, '*N 1']  
-NVec2 = Float32[torch.Tensor, '*N 2']  
-NVec3 = Float32[torch.Tensor, '*N 3']  
-NVec4 = Float32[torch.Tensor, '*N 4']  
-NVec5 = Float32[torch.Tensor, '*N 5']  
-NVec6 = Float32[torch.Tensor, '*N 6']  
+from .typecheck import typechecked, Float32, Int32,\
+  Bool, jaxtyped, Vec1, Vec2, Vec3, NVec3, NFloat32
 
 
-NVec = Float32[torch.Tensor, '*N']  
 
 
-@jaxtyped
-@dataclass 
-class Skeleton: 
-
-  points: Float32[torch.Tensor, 'N 3']  
-  radii: Float32[torch.Tensor, 'N 1']
-  edges: Int32[torch.Tensor, 'M 2']  
-
-  @property
-  def bounds(self):
-    return AABox(self.points.min(axis=0).values, self.points.max(axis=0).values)
-
-  @cached_property
-  def segments(self):
-
-    return Segment(
-      self.points[self.edges[:, 0]], 
-      self.points[self.edges[:, 1]])
-
-  @cached_property
-  def tubes(self):
-    radii = torch.stack([
-        self.radii[self.edges[:, 0]], 
-        self.radii[self.edges[:, 1]]], dim=-1).squeeze(1)
-    
-    return Tube(segment=self.segments, radii=radii)
-  
 
 @dataclass(repr=False)
 class Sphere(TensorClass):
@@ -274,7 +232,7 @@ class Segment(TensorClass):
 
     return Hit(seg, t1, t2)
 
-  def points_at(self, t:NVec):
+  def points_at(self, t:NFloat32):
     return self.a + (self.b - self.a) * t.unsqueeze(-1)
 
 

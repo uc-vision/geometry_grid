@@ -5,10 +5,11 @@ from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi.field import block_bitmask, placed_field
 
 from geometry_grid.taichi.grid import Grid
-from typeguard import typechecked
+
+from geometry_grid.torch.typecheck import typechecked, TensorClass
 
 import torch
-from .conversion import from_torch
+from .conversion import check_conversion, from_torch, torch_field
 from taichi.types import ndarray
 
 
@@ -74,16 +75,22 @@ class DynamicGrid:
 
     self.add_objects()
     
-
-
   @typechecked
-  def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8, max_occupied=64): 
-    return DynamicGrid(grid, from_torch(objects), 
+  def from_torch(grid:Grid, object_type:ti.lang.struct.StructType, objects:TensorClass, grid_chunk=8, max_occupied=64): 
+    objects = torch_field(object_type, objects)
+
+    return DynamicGrid(grid, object_type, objects, 
       max_occupied=max_occupied, device=objects.device, grid_chunk=grid_chunk)
 
 
   def update_objects(self, objects:TensorClass):
-    self.objects.from_torch(asdict(objects))
+    check_conversion(self.objects.dtype, objects)
+    if objects.batch_shape == self.objects.shape:
+      self.objects.from_torch(objects.asdict())
+    else:
+      objects = torch_field(self.objects.dtype, objects)
+
+
     self.cells.parent().deactivate_all()
     self.add_objects()
 
@@ -154,7 +161,6 @@ class DynamicGrid:
 
       index.prefix[v] = p
       index.count[v] = counts[i]
-
 
 
   def update_index(self):
