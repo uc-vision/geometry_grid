@@ -79,24 +79,6 @@ def struct_size(ti_struct:ti.lang.struct.StructType):
       raise TypeError(f"Unsupported type {v}")
   return size
 
-# @cache
-# def from_flat(dim, dtype):
-
-#   @ti.kernel
-#   def k(target:ti.template(), source:ti.types.ndarray(ti.types.vector(dim=dim, dtype=dtype))):
-#     for I in ti.grouped(target):
-#       target[I] = dtype.from_vec(source[I])
-
-#   return k
-
-# @beartype
-# def flat_field(data:TensorClass, ti_struct:ti.lang.struct.StructType):
-#   check_conversion(data, ti_struct)
-
-#   field = ti_struct.field(shape=data.batch_shape)
-#   field.from_torch(field, data.flat())
-  
-#   return field
 
 
 @typechecked
@@ -112,6 +94,8 @@ def tensorclass_field(data:TensorClass, dtype:ti.lang.struct.StructType):
 def field_shape(field:ti.lang.struct.StructField):
   return {k:taichi_shape(v) for k, v in field.field_dict.items()}
 
+
+# def from_vec():
 
 
 
