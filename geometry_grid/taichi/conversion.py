@@ -64,7 +64,7 @@ def taichi_shape(ti_type):
     return (ti_type.get_shape(), taichi_torch[ti_type.dtype])
 
   else:
-    raise TypeError(f"Unsupported type {ti_type}")
+    return (1, taichi_torch[ti_type.dtype])
 
 
 
@@ -76,7 +76,7 @@ def struct_size(ti_struct:ti.lang.struct.StructType):
     elif isinstance(v, ti.lang.struct.StructType):
       size += struct_size(v)
     else:
-      raise TypeError(f"Unsupported type {v}")
+      size += 1
   return size
 
 
@@ -91,8 +91,8 @@ def tensorclass_field(data:TensorClass, dtype:ti.lang.struct.StructType):
   
   return field
 
-def field_shape(field:ti.lang.struct.StructField):
-  return {k:taichi_shape(v) for k, v in field.field_dict.items()}
+# def field_shape(field:ti.lang.struct.StructField):
+#   return {k:taichi_shape(v) for k, v in field.field_dict.items()}
 
 
 def flatten_dicts(d:dict):
@@ -100,38 +100,54 @@ def flatten_dicts(d:dict):
   for k, v in d.items():
     if isinstance(v, dict):
       for k2, v2 in flatten_dicts(v).items():
-        out[(k, k2)] = v2
+        out[(k,) + k2] = v2
     else:
-      out[k] = v
+      out[ (k,) ] = v
   return out
 
+def _elem_type(shape, dtype):
+    if shape == 1:
+      return f"{torch_taichi[dtype]}"
+    elif isinstance(shape, tuple):
+      if len(shape) == 1:
+        return f"ti.types.vector({shape[0]}, {dtype})"
+      else:
+        return f"ti.types.matrix({shape[0]}, {shape[1]}, {dtype})"
+    raise TypeError(f"Unsupported shape {shape}")
+    
+
+    
 @cache
 def generate_fromtorch(dtype:ti.lang.struct.StructType, tensorclass_type:type):
-    shape = flatten_dicts(field_shape(dtype))
+    shape = flatten_dicts(taichi_shape(dtype))
 
-    def to_param(k, shape, dtype):
-      return f"{k} : ti.types.ndarray(shape={shape}, dtype={dtype})"
-    
     vars = [(f"v{i}", k, shape, dtype)  for i, (k, (shape, dtype)) in enumerate(shape.items())]
-    params = [to_param(v, shape, dtype) for v, _, shape, dtype in vars]
+    params = [f"{v}:ti.types.ndarray(dtype={_elem_type(shape, dtype)})" 
+              for v, _, shape, dtype in vars]
 
     def path(k):
       return ".".join(k)
 
     def make_setter(v, k, shape, dtype):
-      f"_field.{path(k)}[i] = {v}[i]"
+      return f"_field.{path(k)}[i] = {v}[i]"
 
-    setters = '\n'.join([make_setter(v, k, shape, dtype) for v, k, shape, dtype in vars])
+    setters = '\n      '.join([make_setter(v, k, shape, dtype) 
+                         for v, k, shape, dtype in vars])
 
     func = f"""
-    @typechecked
-    def from_torch(t:{tensorclass_type.__name__}, field:ti.lang.struct.StructField):
-    
-      @ti.kernel
-      def _from_torch(_field:ti.template(), {', '.join(params)}):
-        for i in ti.static(ti.ndrange(*_field.shape)):
-          {setters}  
-    """
+@typechecked
+def from_torch(t:{tensorclass_type.__name__}, field:ti.lang.struct.StructField):
+  params = flatten_params(t)
+
+  @ti.kernel
+  def _from_torch(_field:ti.template(), {', '.join(params)}):
+    for i in ti.static(ti.ndrange(*_field.shape)):
+      {setters}
+
+  return _from_torch(field, **asdict(t))
+"""
+
+    print(func)
 
 
 @typechecked
