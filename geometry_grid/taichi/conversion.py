@@ -1,6 +1,6 @@
 from dataclasses import asdict, dataclass, is_dataclass
 from functools import cache
-from typing import Mapping, Optional, Sequence
+from typing import Dict, Mapping, Optional, Sequence
 import taichi as ti
 
 import torch
@@ -95,9 +95,43 @@ def field_shape(field:ti.lang.struct.StructField):
   return {k:taichi_shape(v) for k, v in field.field_dict.items()}
 
 
-# def from_vec():
+def flatten_dicts(d:dict):
+  out = {}
+  for k, v in d.items():
+    if isinstance(v, dict):
+      for k2, v2 in flatten_dicts(v).items():
+        out[(k, k2)] = v2
+    else:
+      out[k] = v
+  return out
 
+@cache
+def generate_fromtorch(dtype:ti.lang.struct.StructType, tensorclass_type:type):
+    shape = flatten_dicts(field_shape(dtype))
 
+    def to_param(k, shape, dtype):
+      return f"{k} : ti.types.ndarray(shape={shape}, dtype={dtype})"
+    
+    vars = [(f"v{i}", k, shape, dtype)  for i, (k, (shape, dtype)) in enumerate(shape.items())]
+    params = [to_param(v, shape, dtype) for v, _, shape, dtype in vars]
+
+    def path(k):
+      return ".".join(k)
+
+    def make_setter(v, k, shape, dtype):
+      f"_field.{path(k)}[i] = {v}[i]"
+
+    setters = '\n'.join([make_setter(v, k, shape, dtype) for v, k, shape, dtype in vars])
+
+    func = f"""
+    @typechecked
+    def from_torch(t:{tensorclass_type.__name__}, field:ti.lang.struct.StructField):
+    
+      @ti.kernel
+      def _from_torch(_field:ti.template(), {', '.join(params)}):
+        for i in ti.static(ti.ndrange(*_field.shape)):
+          {setters}  
+    """
 
 
 @typechecked
