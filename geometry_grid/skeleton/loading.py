@@ -10,7 +10,7 @@ from py_structs.numpy import shape
 import torch
 
 from geometry_grid.taichi.geometry_types import Tube
-from ..torch.data_types import AABox, Segment
+from ..torch.geometry_types import AABox, Segment
 
 
 from geometry_grid.torch.typecheck import Float32, Int32, jaxtyped

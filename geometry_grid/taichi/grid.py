@@ -5,10 +5,10 @@ from taichi.types import ndarray
 
 
 from geometry_grid import torch as torch_geom
-from typeguard import typechecked
 
 import torch
 from geometry_grid.taichi.geometry_types import AABox, Segment, Tube
+from geometry_grid.torch.typecheck import typechecked
 
 
 def point_bounds(points:torch.Tensor) -> torch_geom.AABox:
@@ -17,7 +17,7 @@ def point_bounds(points:torch.Tensor) -> torch_geom.AABox:
 
 
 def from_aabox(box:torch_geom.AABox):
-  assert box.shape == ()
+  assert box.batch_shape == (), f"box shape {box.batch_shape}"
   l, u = [x.cpu().numpy() for x in [box.lower, box.upper]]
   return AABox(l, u)
 
@@ -52,9 +52,10 @@ def morton_sort(points:torch.Tensor, bounds=None, n=1024):
 
 @ti.data_oriented
 class Grid:
-  @typechecked
   def __init__(self, bounds:AABox, size:ivec3):
 
+    print(dir(AABox))
+    
     self.bounds = bounds 
     self.size = size
 

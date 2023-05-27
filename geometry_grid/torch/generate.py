@@ -8,7 +8,7 @@ from typeguard import typechecked
 from open3d_vis import render
 import open3d as o3d
 
-from geometry_grid.torch.types import dot
+from geometry_grid.torch.geometry_types import dot
 
 
 @typechecked

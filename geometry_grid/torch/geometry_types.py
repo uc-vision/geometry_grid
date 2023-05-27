@@ -4,7 +4,6 @@ from numbers import Number
 import numpy as np
 
 from open3d_vis import render
-from typeguard import typechecked
 
 from tensorclass import TensorClass
 

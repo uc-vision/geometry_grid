@@ -3,17 +3,17 @@ from typing import Tuple
 import torch
 
 import geometry_grid.torch as torch_geom
-from typeguard import typechecked
 
 from open3d_vis import render
 import open3d as o3d
 
-from geometry_grid.torch.data_types import dot
+from geometry_grid.torch.geometry_types import dot
+from geometry_grid.torch.typecheck import typechecked
 
 
 @typechecked
 def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
-  i = torch.randint(low=0, high=tubes.shape[0] -1, 
+  i = torch.randint(low=0, high=tubes.batch_shape[0] -1, 
     size=(int(n),), device=tubes.device)
 
   tubes = tubes[i]
@@ -33,7 +33,7 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   
 @typechecked
 def around_segments(segments:torch_geom.Segment, n:int, radius:float, point_var:float = 0.01):
-  tubes = torch_geom.Tube(segments, torch.full((segments.shape[0], 2), radius, device=segments.device))
+  tubes = torch_geom.Tube(segments, torch.full((*segments.batch_shape, 2), radius, device=segments.device))
   return around_tubes(tubes, n, point_var=point_var)
 
 def random_segments(bounds:torch_geom.AABox,

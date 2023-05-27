@@ -4,7 +4,7 @@ import torch
 
 from geometry_grid.torch.random import random_segments
 
-from ..torch.dataclass import TensorClass
+from tensorclass import TensorClass
 from geometry_grid.taichi.conversion import from_torch
 
 from taichi.math import vec3

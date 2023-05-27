@@ -9,7 +9,7 @@ from geometry_grid.taichi.grid import Grid
 from geometry_grid.torch.typecheck import typechecked, TensorClass
 
 import torch
-from .conversion import check_conversion, from_torch, torch_field
+from .conversion import check_conversion, tensorclass_field
 from taichi.types import ndarray
 
 
@@ -76,19 +76,19 @@ class DynamicGrid:
     self.add_objects()
     
   @typechecked
-  def from_torch(grid:Grid, object_type:ti.lang.struct.StructType, objects:TensorClass, grid_chunk=8, max_occupied=64): 
-    objects = torch_field(object_type, objects)
+  def from_torch(grid:Grid, object_type:ti.lang.struct.StructType, torch_objects:TensorClass, grid_chunk=8, max_occupied=64): 
+    objects = tensorclass_field(torch_objects, object_type)
 
-    return DynamicGrid(grid, object_type, objects, 
-      max_occupied=max_occupied, device=objects.device, grid_chunk=grid_chunk)
+    return DynamicGrid(grid, objects, 
+      max_occupied=max_occupied, device=torch_objects.device, grid_chunk=grid_chunk)
 
 
-  def update_objects(self, objects:TensorClass):
+  def update_objects(self, torch_objects:TensorClass):
     check_conversion(self.objects.dtype, objects)
-    if objects.batch_shape == self.objects.shape:
-      self.objects.from_torch(objects.asdict())
+    if torch_objects.batch_shape == self.objects.shape:
+      self.objects.from_torch(torch_objects.asdict())
     else:
-      objects = torch_field(self.objects.dtype, objects)
+      objects = tensorclass_field(torch_objects, self.objects.dtype)
 
 
     self.cells.parent().deactivate_all()
@@ -149,11 +149,9 @@ class DynamicGrid:
   def _fill_index(self,  index:ti.template(), prefix:ndarray(ti.i32, ndim=1), counts:ndarray(ti.i32, ndim=1), 
     coords:ndarray(ivec3, ndim=1)):
 
-    print(counts.shape[0])
     for i in range(counts.shape[0]):
       v = coords[i]
-
-      p = ti.select(i > 0, prefix[i - 1], 0)
+      p =  prefix[i - 1] if i > 0 else 0
 
       for j in range(counts[i]):
         idx = self.occupied[v.x, v.y, v.z, j]

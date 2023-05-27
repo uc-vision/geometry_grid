@@ -7,12 +7,13 @@ import taichi as ti
 
 from geometry_grid.taichi.dynamic_grid import DynamicGrid
 from geometry_grid.taichi.point_distances import min_distances, distances
+from geometry_grid.taichi.point_query import point_query
 
 import geometry_grid.torch as torch_geom
 import geometry_grid.taichi as ti_geom
 
-from typeguard import typechecked
 from geometry_grid.torch.random import around_segments, random_segments
+from geometry_grid.torch.typecheck import typechecked
 
 
 
@@ -26,12 +27,13 @@ def run_test(bounds:torch_geom.AABox,
   radius:float=0.5):
 
   segs = random_segments(bounds, length_range=(seg_length * 0.5, seg_length * 2.0), n=n)
-  points = around_segments(segs, radius, n_points)
+  
+  points = around_segments(segs, n_points, radius)
 
-  grid = ti_geom.Grid(bounds, grid_size)
+  grid = ti_geom.Grid.fixed_size(bounds, grid_size)
   obj_grid = DynamicGrid.from_torch(grid, ti_geom.Segment, segs, max_occupied=64)
 
-  dist1, idx1 = obj_grid.point_query(points, 1.0)
+  dist1, idx1 = point_query(obj_grid.index, points, 1.0)
   dist2, idx2 = min_distances(segs, points, 1.0)
 
   assert torch.sum(idx1 >= 0) == torch.sum(idx2 >= 0)

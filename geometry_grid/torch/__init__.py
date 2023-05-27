@@ -1,2 +1,2 @@
-from .data_types import *
+from .geometry_types import *
 from .random import *
