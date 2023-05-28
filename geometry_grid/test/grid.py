@@ -34,7 +34,7 @@ def run_test(bounds:torch_geom.AABox,
   obj_grid = DynamicGrid.from_torch(grid, ti_geom.Segment, segs, max_occupied=64)
 
   dist1, idx1 = point_query(obj_grid.index, points, 1.0)
-  dist2, idx2 = min_distances(segs, points, 1.0)
+  dist2, idx2 = min_distances(ti_geom.Segment, segs, points, 1.0)
 
   assert torch.sum(idx1 >= 0) == torch.sum(idx2 >= 0)
   assert torch.allclose(dist1, dist2)

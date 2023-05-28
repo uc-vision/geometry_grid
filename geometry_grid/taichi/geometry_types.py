@@ -115,6 +115,11 @@ class Segment:
   b: vec3
 
   @ti.func
+  def from_vec(self, v:ti.types.vector(6, ti.f32)):
+    self.a = v[:3]
+    self.b = v[3:]
+    
+  @ti.func
   def dir(self) -> vec3:
     return self.b - self.a
 

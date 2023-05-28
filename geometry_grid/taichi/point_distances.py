@@ -5,9 +5,11 @@ import torch
 from geometry_grid.torch.random import random_segments
 
 from tensorclass import TensorClass
-from geometry_grid.taichi.conversion import from_torch
+from geometry_grid.taichi.conversion import check_conversion, from_torch, struct_size
 
 from taichi.math import vec3
+
+from geometry_grid.torch.typecheck import typechecked
 
 @ti.func 
 def atomic_min_index(dist:ti.f32, index:ti.int32, 
@@ -34,21 +36,27 @@ def _min_distance(objects:ti.template(),
 
 
 
-@ti.kernel
-def _min_distances(objects:ti.template(), 
-  points:ndarray(ti.math.vec3), radius:ti.f32,
-  distances:ndarray(ti.f32), indices:ndarray(ti.i32)):
 
-  for j in range(points.shape[0]):
-    distances[j], indices[j] = _min_distance(objects, points[j], radius)
-
-
-def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
+@typechecked
+def min_distances(obj_struct, objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   indexes = torch.full_like(distances, -1, dtype=torch.int32)
 
-  objs = from_torch(objects)
-  _min_distances(objs, points, max_distance, distances, indexes)
+  check_conversion(objects, obj_struct)
+  size = struct_size(obj_struct)
+
+  @ti.kernel
+  def _min_distances(objects:ti.types.ndarray(dtype=ti.types.vector(size, ti.f32), ndim=1),
+    points:ndarray(ti.math.vec3), radius:ti.f32,
+    distances:ndarray(ti.f32), indices:ndarray(ti.i32)):
+
+    for j in range(points.shape[0]):
+      obj = obj_struct()
+      obj.from_vec(objects[j])
+      distances[j], indices[j] = _min_distance(obj, points[j], radius)
+
+
+  _min_distances(objects.flat(), points, max_distance, distances, indexes)
   return distances, indexes
 
 

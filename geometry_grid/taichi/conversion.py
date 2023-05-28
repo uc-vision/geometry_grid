@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass, is_dataclass
 from functools import cache
 from typing import Dict, Mapping, Optional, Sequence
+from numpy import product
 import taichi as ti
 
 import torch
@@ -39,6 +40,7 @@ def from_tensor(x:torch.Tensor, dtype=None):
   v.from_torch(x)
   return v
 
+@typechecked
 def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
   data_name = data.__class__.__name__
   
@@ -47,8 +49,8 @@ def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
       raise TypeError(f"Missing field in struct {k} in {data_name}")
 
     if isinstance(v, ti.lang.matrix.VectorType):
-      if data.shapes[k] != v.get_shape():
-        raise TypeError(f"Expected {k} to have shape {v.get_shape()}, got {data.shapes[v]}")
+      if data.shape[k] != v.get_shape():
+        raise TypeError(f"Expected {k} to have shape {v.get_shape()}, got {data.shape[v]}")
     elif isinstance(v, ti.lang.struct.StructType):
       check_conversion(getattr(data, k), v)
 
@@ -70,7 +72,8 @@ def struct_size(ti_struct:ti.lang.struct.StructType):
   size = 0
   for k, v in ti_struct.members.items():
     if isinstance(v, ti.lang.matrix.VectorType):
-      size += v.get_shape()[0] * v.get_shape()[1]
+
+      size += product(v.get_shape())
     elif isinstance(v, ti.lang.struct.StructType):
       size += struct_size(v)
     else:
