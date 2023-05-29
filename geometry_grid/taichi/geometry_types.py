@@ -107,6 +107,31 @@ class AABox:
       d[i] +=  ti.max(0., p[i] - self.lower[i]) + ti.max(0., p[i] - self.upper[i])
     return ti.sqrt(tm.dot(d, d))
 
+
+
+@ti.dataclass
+class Plane:
+  normal: vec3
+  d: ti.f32
+
+  @ti.func
+  def from_vec(self, v:ti.types.vector(4, ti.f32)):
+    self.normal = v[:3]
+    self.d = v[3]
+
+  @ti.func
+  def point_distance(self, p:vec3):
+    return tm.abs(tm.dot(p, self.normal) + self.d)
+  
+  @ti.func
+  def from_points(self, a:vec3, b:vec3, c:vec3):
+    self.normal = tm.cross(b - a, c - a).normalized()
+    self.d = -tm.dot(self.normal, a)
+
+
+
+
+
 @ti.dataclass
 class Segment:
   """A line segment in 3D space."""

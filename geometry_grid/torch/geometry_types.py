@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from numbers import Number
+from typing import Optional
 import numpy as np
 
 from open3d_vis import render
@@ -142,6 +143,23 @@ class Hit(TensorClass):
 def dot(a, b):
   return torch.einsum('...d,...d->...', a, b)
 
+
+@dataclass(repr=False)
+class Plane(TensorClass):
+  normal: Vec3
+  d: Vec1
+
+  def distance(self, p:Vec3):
+    return dot(self.normal, p) + self.d
+  
+  @staticmethod
+  def from_points(p1:Vec3, p2:Vec3, p3:Vec3):
+    n = torch.cross(p2 - p1, p3 - p1)
+    n = n / torch.norm(n)
+    return Plane(n, -dot(n, p1))
+  
+
+
 @dataclass(repr=False)
 class Line(TensorClass):
   p: Vec3
@@ -230,6 +248,14 @@ class Segment(TensorClass):
     t2 = 1 - torch.minimum(b_start, b_end).max(dim=2).values
 
     return Hit(seg, t1, t2)
+  
+  def plane_intersections(seg:'Segment', plane:Plane) -> Hit:
+      denom = dot(seg.dir, plane.normal)
+      t = (plane.d - dot(seg.a, plane.normal)) / denom
+      return Hit(seg, t, t)
+  
+  
+     
 
   def points_at(self, t:NFloat32):
     return self.a + (self.b - self.a) * t.unsqueeze(-1)

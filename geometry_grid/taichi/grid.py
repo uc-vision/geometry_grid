@@ -54,8 +54,7 @@ def morton_sort(points:torch.Tensor, bounds=None, n=1024):
 class Grid:
   def __init__(self, bounds:AABox, size:ivec3):
 
-    print(dir(AABox))
-    
+  
     self.bounds = bounds 
     self.size = size
 

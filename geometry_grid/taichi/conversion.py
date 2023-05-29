@@ -11,7 +11,11 @@ from tensorclass import TensorClass
 from py_structs.torch import shape
 
 import geometry_grid.taichi.geometry_types as ti_geom
+import geometry_grid.torch.geometry_types as torch_geom
+
 from geometry_grid.torch.typecheck import typechecked
+
+
 
 torch_taichi = {
     torch.float32: ti.f32,
@@ -40,19 +44,34 @@ def from_tensor(x:torch.Tensor, dtype=None):
   v.from_torch(x)
   return v
 
-@typechecked
-def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
-  data_name = data.__class__.__name__
-  
+
+
+def _check_shape(data_name, struct_shape, ti_struct:ti.lang.struct.StructType):
   for k, v in ti_struct.members.items():
-    if not hasattr(data, k):
-      raise TypeError(f"Missing field in struct {k} in {data_name}")
+    if not k in struct_shape:
+      raise TypeError(f"Missing field in struct {k} in {data_name} {sorted(ti_struct.members.keys())} vs. {sorted(struct_shape.keys())}")
 
     if isinstance(v, ti.lang.matrix.VectorType):
-      if data.shape[k] != v.get_shape():
-        raise TypeError(f"Expected {k} to have shape {v.get_shape()}, got {data.shape[v]}")
+      shape, dtype = struct_shape[k]
+
+      if shape != v.get_shape():
+        raise TypeError(f"Expected {k} to have shape {v.get_shape()}, got {shape}")
+      
+      if dtype != taichi_torch[v.dtype]:
+        raise TypeError(f"Expected {k} to have dtype {taichi_torch[v.dtype]}, got {dtype}")
+
     elif isinstance(v, ti.lang.struct.StructType):
-      check_conversion(getattr(data, k), v)
+      _check_shape(f"{data_name}.{k}", struct_shape[k], v)
+
+
+@typechecked
+def check_static_conversion(cls:type, ti_struct:ti.lang.struct.StructType):
+  static_shape = cls.static_shape_info()
+  _check_shape(cls.__name__, static_shape, ti_struct)
+
+@typechecked
+def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
+  _check_shape(data.__class__.__name__, data.shape_info, ti_struct)
 
 
 def taichi_shape(ti_type):
@@ -128,10 +147,43 @@ def type_str(shape, dtype):
     raise TypeError(f"Unsupported shape {shape}")
     
 
+_conversions = {
+  torch_geom.AABox : ti_geom.AABox,
+  torch_geom.Sphere : ti_geom.Sphere,
+  torch_geom.Plane : ti_geom.Plane,
+  torch_geom.Line : ti_geom.Line,
+  torch_geom.Segment : ti_geom.Segment,
+  torch_geom.Tube : ti_geom.Tube
+}
+
+conversions = {}   
+
+def register_conversion(torch_type:type, ti_type:ti.lang.struct.StructType):
+  assert issubclass(torch_type, TensorClass)
+  check_static_conversion(torch_type, ti_type)
+
+  conversions[torch_type] = ti_type
+
+for k, v in _conversions.items():
+  register_conversion(k, v)
+
+
+def list_conversions():
+  return [cls.__name__ for cls in conversions.keys()]
 
 @typechecked
-def from_torch(data:torch.Tensor | Mapping | Sequence):
-  if isinstance(data, torch.Tensor):
+def converts_to(data:TensorClass):
+  assert data.__class__ in conversions, f"Unsupported type {data.__class__}, options are {list_conversions()} use register_conversion"
+  return conversions[data.__class__]
+
+
+@typechecked
+def from_torch(data:torch.Tensor | Mapping | Sequence | TensorClass):
+  if isinstance(data, TensorClass):
+    assert data.__class__ in conversions, f"Unsupported type {data.__class__},  options are {list_conversions()}, use register_conversion"
+    return tensorclass_field(data, conversions[data.__class__])
+  
+  elif isinstance(data, torch.Tensor):
     return from_tensor(data)
   elif is_dataclass(data):
     return from_torch(asdict(data))
