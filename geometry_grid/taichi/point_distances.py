@@ -5,12 +5,12 @@ import torch
 
 from geometry_grid.torch.random import random_segments
 
-from tensorclass import TensorClass
 from geometry_grid.taichi.conversion import check_conversion, converts_to, from_torch, struct_size
 
 from taichi.math import vec3
 
 from geometry_grid.torch.typecheck import typechecked
+from tensorclass import TensorClass
 
 @ti.func 
 def atomic_min_index(dist:ti.f32, index:ti.int32, 
@@ -96,16 +96,46 @@ def pairwise_distances(objects:TensorClass, points:torch.Tensor):
   k(objects.flat(), points, distances)
   return distances
 
+def pairwise_distance_func(obj_struct):
+  kernel =  pairwise_distances_kernel(obj_struct)
 
+  class PointDistance(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, objects:torch.Tensor, points:torch.Tensor):
 
-  
-                                                                                                                                                                                                                                                                                                                                                         
+        distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
+        kernel(objects, points, distances)
 
+        ctx.save_for_backward(objects, points, distances)
 
+        return distances
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        objects, points, distances = ctx.saved_tensors
+
+        distances.grad = grad_output
+        print("backward")
+        kernel.grad(objects, points, distances)
+        print("after")
+        
+        return objects.grad, points.grad
+    
+  return PointDistance.apply
 
 if __name__ == "__main__":
-  from geometry_grid.torch.geometry_types import AABox
+  ti.init(debug=True)
 
-  x = random_segments(AABox(torch.tensor([-10.0, -10.0, -10.0]),
-    torch.tensor([10.0, 10.0, 10.0])), n=10)
+  import geometry_grid.torch.geometry_types as torch_geom
+  import geometry_grid.taichi.geometry_types as ti_geom
 
+  segs = torch_geom.Segment(torch.randn(10, 3), torch.randn(10, 3))
+  points = torch.randn(10, 3).requires_grad_(True)
+
+  distance_func = pairwise_distance_func(ti_geom.Segment)
+  distances = distance_func(segs.flat(), points)
+
+  loss = distances.sum()
+  loss.backward()
+
+  print(loss)

@@ -37,8 +37,6 @@ def run_test(bounds:torch_geom.AABox,
     dist1, idx1 = point_query(obj_grid.index, points, max_distance=radius)
     dist2, idx2 = min_point_object(segs, points, max_distance=radius)
 
-    print(torch.sum(idx1 >= 0))
-
     assert torch.sum(idx1 >= 0) == torch.sum(idx2 >= 0)
     assert torch.allclose(dist1, dist2)
 

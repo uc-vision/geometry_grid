@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from functools import cached_property
 from numbers import Number
 from typing import Optional
@@ -7,6 +6,7 @@ import numpy as np
 from open3d_vis import render
 
 from tensorclass import TensorClass
+from dataclasses import dataclass
 
 import torch
 from .typecheck import typechecked, Float32, Int32,\
