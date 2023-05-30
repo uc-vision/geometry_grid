@@ -5,15 +5,15 @@ import torch
 
 import taichi as ti
 
-from geometry_grid.taichi.dynamic_grid import DynamicGrid
-from geometry_grid.taichi.point_distances import min_point_object, pairwise_distances
-from geometry_grid.taichi.point_query import point_query
+from geometry_grid.taichi_geometry.dynamic_grid import DynamicGrid
+from geometry_grid.taichi_geometry.point_distances import min_point_object, pairwise_distances
+from geometry_grid.taichi_geometry.point_query import point_query
 
-import geometry_grid.torch as torch_geom
-import geometry_grid.taichi as ti_geom
+import geometry_grid.torch_geometry as torch_geom
+import geometry_grid.taichi_geometry as ti_geom
 
-from geometry_grid.torch.random import around_segments, random_segments
-from geometry_grid.torch.typecheck import typechecked
+from geometry_grid.torch_geometry.random import around_segments, random_segments
+from geometry_grid.torch_geometry.typecheck import typechecked
 
 
 

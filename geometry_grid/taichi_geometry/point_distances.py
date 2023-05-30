@@ -3,13 +3,13 @@ import taichi as ti
 from taichi.types import ndarray
 import torch
 
-from geometry_grid.torch.random import random_segments
+from geometry_grid.torch_geometry.random import random_segments
 
-from geometry_grid.taichi.conversion import check_conversion, converts_to, from_torch, struct_size
+from geometry_grid.taichi_geometry.conversion import check_conversion, converts_to, from_torch, struct_size
 
 from taichi.math import vec3
 
-from geometry_grid.torch.typecheck import typechecked
+from geometry_grid.torch_geometry.typecheck import typechecked
 from tensorclass import TensorClass
 
 @ti.func 
@@ -126,8 +126,8 @@ def pairwise_distance_func(obj_struct):
 if __name__ == "__main__":
   ti.init(debug=True)
 
-  import geometry_grid.torch.geometry_types as torch_geom
-  import geometry_grid.taichi.geometry_types as ti_geom
+  import geometry_grid.torch_geometry.geometry_types as torch_geom
+  import geometry_grid.taichi_geometry.geometry_types as ti_geom
 
   segs = torch_geom.Segment(torch.randn(10, 3), torch.randn(10, 3))
   points = torch.randn(10, 3).requires_grad_(True)

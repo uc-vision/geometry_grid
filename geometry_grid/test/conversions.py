@@ -1,8 +1,8 @@
 
-from geometry_grid.taichi import conversion
+from geometry_grid.taichi_geometry import conversion
 
-import geometry_grid.taichi as ti_geom
-import geometry_grid.torch as torch_geom
+import geometry_grid.taichi_geometry as ti_geom
+import geometry_grid.torch_geometry as torch_geom
 
 import taichi as ti
 import torch

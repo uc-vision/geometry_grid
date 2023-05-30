@@ -2,11 +2,11 @@ from dataclasses import asdict
 from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
-from geometry_grid.taichi.field import block_bitmask, placed_field
+from geometry_grid.taichi_geometry.field import block_bitmask, placed_field
 
-from geometry_grid.taichi.grid import Grid
+from geometry_grid.taichi_geometry.grid import Grid
 
-from geometry_grid.torch.typecheck import typechecked, TensorClass
+from geometry_grid.torch_geometry.typecheck import typechecked, TensorClass
 
 import torch
 from .conversion import check_conversion, tensorclass_field

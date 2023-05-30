@@ -10,10 +10,10 @@ from beartype import beartype
 from tensorclass import TensorClass
 from py_structs.torch import shape
 
-import geometry_grid.taichi.geometry_types as ti_geom
-import geometry_grid.torch.geometry_types as torch_geom
+import geometry_grid.taichi_geometry.geometry_types as ti_geom
+import geometry_grid.torch_geometry.geometry_types as torch_geom
 
-from geometry_grid.torch.typecheck import typechecked
+from geometry_grid.torch_geometry.typecheck import typechecked
 
 
 
