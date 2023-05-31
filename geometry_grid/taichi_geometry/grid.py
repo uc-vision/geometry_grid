@@ -4,11 +4,11 @@ from taichi.math import vec3, ivec3, clamp
 from taichi.types import ndarray
 
 
-from geometry_grid import torch as torch_geom
+from geometry_grid import torch_geometry as torch_geom
 
 import torch
-from geometry_grid.taichi.geometry_types import AABox, Segment, Tube
-from geometry_grid.torch.typecheck import typechecked
+from geometry_grid.taichi_geometry.geometry_types import AABox, Segment, Tube
+from geometry_grid.torch_geometry.typecheck import typechecked
 
 
 def point_bounds(points:torch.Tensor) -> torch_geom.AABox:

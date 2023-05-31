@@ -5,7 +5,7 @@ from taichi.math import vec3, ivec3, vec2
 import taichi.math as tm
 
 import numpy as np
-import geometry_grid.torch as ng
+import geometry_grid.torch_geometry as ng
 
 @ti.dataclass
 class Sphere:

@@ -1,1 +1,1 @@
-from . import torch, taichi
+from . import torch_geometry, taichi_geometry

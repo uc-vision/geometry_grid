@@ -9,11 +9,11 @@ import open3d as o3d
 from py_structs.numpy import shape
 import torch
 
-from geometry_grid.taichi.geometry_types import Tube
-from ..torch.geometry_types import AABox, Segment
+from geometry_grid.taichi_geometry.geometry_types import Tube
+from ..torch_geometry.geometry_types import AABox, Segment
 
 
-from geometry_grid.torch.typecheck import Float32, Int32, jaxtyped
+from geometry_grid.torch_geometry.typecheck import Float32, Int32, jaxtyped
 
 @jaxtyped
 @dataclass 
