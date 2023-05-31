@@ -1,18 +1,11 @@
-
-
 import math
-from pathlib import Path
 
 import taichi as ti
 from taichi.math import vec3
 import torch
 from geometry_grid.taichi.dynamic_grid import DynamicGrid
-from geometry_grid.taichi.geometry_types import AABox
-from geometry_grid.skeleton.loading import display_skeleton, load_tree
 
 from geometry_grid.taichi.grid import Grid, morton_sort
-from geometry_grid.taichi.counted_grid import CountedGrid
-
 from geometry_grid.taichi.point_query import point_query
 
 
@@ -23,7 +16,7 @@ from tqdm import tqdm
 from open3d_vis import render
 import open3d as o3d
 
-from geometry_grid.torch.random import around_segments, random_segments, random_tubes
+from geometry_grid.torch.random import around_segments, random_segments
 
 
   
