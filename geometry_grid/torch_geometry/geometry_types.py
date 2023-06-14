@@ -259,8 +259,8 @@ class Segment(TensorClass):
       t = (plane.d - dot(seg.a, plane.normal)) / denom
       return Hit(seg, t, t)
   
-  
-     
+  def render(self, colors=None):
+    return render.segments(self.a, self.b, colors=colors)
 
   def points_at(self, t:NFloat32):
     return self.a + (self.b - self.a) * t.unsqueeze(-1)
@@ -287,12 +287,14 @@ class Tube(TensorClass):
   def b(self):
     return Sphere(self.segment.b, self.radii[:, 0])
 
-
   @property
   def bounds(self):
     return self.a.bounds.union(self.b.bounds,
       self.b.bounds).union(
         self.segment.bounds)
+  
+  def render(self, colors=None):
+    return render.tube_loops(self.segment.a, self.segment.b, self.radii, colors=colors)
 
 if __name__=="__main__":
   seg1 = Segment(torch.tensor([[0.0, -1.0, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)

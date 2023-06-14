@@ -21,16 +21,16 @@ from open3d_vis import render
 import open3d as o3d
 
 
-def display_distances(segs:torch_geom.Segment, boxes, points, dist):
+def display_distances(geom, boxes, points, dist):
   red = torch.tensor([1.0, 0.0, 0.0], device=device)
   green = torch.tensor([0.0, 1.0, 0.0], device=device)
 
   t = (dist / 20.0).unsqueeze(1).clamp(0.0, 1.0)
 
   colors = (red * t + green * (1.0 - t)).squeeze()
-  skel = render.segments(segs.a, segs.b, color=(0, 0, 1))
+  geom = geom.render().paint_uniform_color((0, 0, 1))
 
-  o3d.visualization.draw([skel, boxes.render(), 
+  o3d.visualization.draw([geom, boxes.render(), 
     render.point_cloud(points, colors=colors)])
 
 
@@ -53,15 +53,15 @@ if __name__ == "__main__":
   torch.manual_seed(0)  
 
   bounds = torch_geom.AABox.from_to(0, 10, device=device)
-  segs = random_segments(bounds, length_range=(0.5, 3), n=100).to(device)
-  
-  points = torch_geom.around_segments(segs, n=1000000, radius=0.2)
+  tubes = torch_geom.random_tubes(bounds, length_range=(0.5, 3), radius_range=(0.4, 0.6), n=100).to(device)
+
+  points = torch_geom.around_tubes(tubes, n=1000000, radius=0.05)
 
   print("Generate grid...")
   grid = DynamicGrid.from_torch(
     Grid.fixed_cell(bounds,  1.0), 
     # Grid.fixed_size(skeleton.bounds, (64, 64, 64)), 
-    segs,  max_occupied=64)
+    tubes,  max_occupied=64)
 
 
   print("Grid size: ", grid.grid.size)
@@ -77,6 +77,6 @@ if __name__ == "__main__":
 
 
 
-  display_distances(segs, grid.grid.get_boxes(cells), points, dist)
+  display_distances(tubes, grid.grid.get_boxes(cells), points, dist)
 
 
