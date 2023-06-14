@@ -55,9 +55,14 @@ class AABox(TensorClass):
   upper: Vec3 
 
   @staticmethod
-  def from_to(lower:Number, upper:Number, device:torch.device):
-    lower = torch.tensor([lower, lower, lower], dtype=torch.float32, device=device)
-    upper = torch.tensor([upper, upper, upper],  dtype=torch.float32, device=device)
+  def from_to(lower:Number | tuple[Number, Number, Number], upper:Number | tuple[Number, Number, Number], device:torch.device=torch.device('cpu')):
+    if isinstance(lower, Number):
+      lower = (lower, lower, lower)
+    if isinstance(upper, Number):
+      upper = (upper, upper, upper)
+
+    lower = torch.tensor(lower, dtype=torch.float32, device=device)
+    upper = torch.tensor(upper,  dtype=torch.float32, device=device)
     return AABox(lower, upper)
 
   @typechecked

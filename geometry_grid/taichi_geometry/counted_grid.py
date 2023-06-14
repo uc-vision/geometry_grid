@@ -4,7 +4,7 @@ from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi_geometry.field import placed_field
 
 from geometry_grid.taichi_geometry.grid import Grid
-from geometry_grid.torch_geometry.dataclass import TensorClass
+from tensorclass import TensorClass
 from typeguard import typechecked
 
 import torch

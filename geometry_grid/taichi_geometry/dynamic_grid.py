@@ -1,5 +1,6 @@
 from dataclasses import asdict
 from typing import Tuple
+from geometry_grid.taichi_geometry.conversion import from_torch
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi_geometry.field import block_bitmask, placed_field
@@ -75,20 +76,22 @@ class DynamicGrid:
 
     self.add_objects()
     
-  @typechecked
-  def from_torch(grid:Grid, object_type:ti.lang.struct.StructType, torch_objects:TensorClass, grid_chunk=8, max_occupied=64): 
-    objects = tensorclass_field(torch_objects, object_type)
+  @typechecked 
+  def from_torch(grid:Grid, torch_objects:TensorClass, grid_chunk=8, max_occupied=64): 
+    objects = from_torch(torch_objects)
 
     return DynamicGrid(grid, objects, 
       max_occupied=max_occupied, device=torch_objects.device, grid_chunk=grid_chunk)
 
 
   def update_objects(self, torch_objects:TensorClass):
-    check_conversion(self.objects.dtype, objects)
+    print(self.objects._members, self.objects._name)
+
+    check_conversion(torch_objects, self.objects)
     if torch_objects.batch_shape == self.objects.shape:
       self.objects.from_torch(torch_objects.asdict())
     else:
-      objects = tensorclass_field(torch_objects, self.objects.dtype)
+      self.objects = tensorclass_field(torch_objects, self.objects.dtype)
 
 
     self.cells.parent().deactivate_all()
@@ -122,7 +125,7 @@ class DynamicGrid:
     for _ in ti.grouped(self.cells):
       total_cells += 1
 
-    return ti.math.vec2(total_cells, total_entries)
+    return ti.math.ivec2(total_cells, total_entries)
 
 
   @ti.kernel

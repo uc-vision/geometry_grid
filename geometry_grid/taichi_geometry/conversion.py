@@ -74,6 +74,10 @@ def check_conversion(data:TensorClass, ti_struct:ti.lang.struct.StructType):
   _check_shape(data.__class__.__name__, data.shape_info, ti_struct)
 
 
+  
+
+
+
 def taichi_shape(ti_type):
   if isinstance(ti_type, ti.lang.struct.StructType):
     return {k:taichi_shape(v) for k, v in ti_type.members.items()}
@@ -148,6 +152,7 @@ def type_str(shape, dtype):
     
 
 _conversions = {
+  torch_geom.Point : ti_geom.Point,
   torch_geom.AABox : ti_geom.AABox,
   torch_geom.Sphere : ti_geom.Sphere,
   torch_geom.Plane : ti_geom.Plane,
