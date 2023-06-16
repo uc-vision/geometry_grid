@@ -287,7 +287,7 @@ class Tube:
   def point_distance(self, p:vec3):
     t, dist_sq = self.segment.point_dist_sq(p)
     r = self.radius_at(t)
-    return ti.sqrt(dist_sq) - r
+    return ti.abs(ti.sqrt(dist_sq) - r)
 
 
   @ti.func

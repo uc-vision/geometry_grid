@@ -25,7 +25,7 @@ def display_distances(geom, boxes, points, dist):
   red = torch.tensor([1.0, 0.0, 0.0], device=device)
   green = torch.tensor([0.0, 1.0, 0.0], device=device)
 
-  t = (dist / 20.0).unsqueeze(1).clamp(0.0, 1.0)
+  t = dist.unsqueeze(1).clamp(0.0, 1.0)
 
   colors = (red * t + green * (1.0 - t)).squeeze()
   geom = geom.render().paint_uniform_color((0, 0, 1))
@@ -52,12 +52,14 @@ if __name__ == "__main__":
   device = torch.device(args.device)
   torch.manual_seed(0)  
 
-  bounds = torch_geom.AABox.from_to(0, 10, device=device)
+  segs = torch_geom.random_segments(torch_geom.AABox.from_to(0, 10, device=device), 
+                                    length_range=(0.5, 3), n=20).to(device)
+  tubes = torch_geom.random_tubes(segs, radius_range=(0.1, 0.3))
 
-  segs = torch_geom.random_segments(bounds, length_range=(0.5, 3), n=100).to(device)
-  tubes = torch_geom.random_tubes(segs, radius_range=(0.2, 0.6))
+  bounds = tubes.bounds.union_all()
 
-  points = torch_geom.around_tubes(tubes, n=1000000, point_var=0.05)
+  point_std = 0.05
+  points = torch_geom.around_tubes(tubes, n=1000000, point_std=point_std)
 
   print("Generate grid...")
   grid = DynamicGrid.from_torch(
@@ -76,6 +78,6 @@ if __name__ == "__main__":
 
 
 
-  display_distances(tubes, grid.grid.get_boxes(cells), points, dist)
+  display_distances(tubes, grid.grid.get_boxes(cells), points, dist / (point_std * 3))
 
 

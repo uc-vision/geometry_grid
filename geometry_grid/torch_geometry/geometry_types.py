@@ -101,6 +101,12 @@ class AABox(TensorClass):
       self.lower.min(other.lower),
       self.upper.max(other.upper)
     )
+  
+  def union_all(self) -> 'AABox':
+    return AABox(
+      self.lower.view(-1, 3).min(axis=0).values, 
+      self.upper.view(-1, 3).max(axis=0).values
+    )
 
 
   def merge(self): 
@@ -269,7 +275,7 @@ class Segment(TensorClass):
 
 @dataclass(repr=False)
 class Tube(TensorClass):
-  """Line segment between two points."""
+  """Cylinder-like segment with radius varying linearly from one end to the other."""
   segment: Segment
   radii: Vec2
 
@@ -281,17 +287,15 @@ class Tube(TensorClass):
 
   @property
   def a(self):
-    return Sphere(self.segment.a, self.radii[:, 0])
+    return Sphere(self.segment.a, self.radii[..., 0:1])
 
   @property
   def b(self):
-    return Sphere(self.segment.b, self.radii[:, 0])
+    return Sphere(self.segment.b, self.radii[..., 1:2])
 
   @property
   def bounds(self):
-    return self.a.bounds.union(self.b.bounds,
-      self.b.bounds).union(
-        self.segment.bounds)
+    return self.a.bounds.union(self.b.bounds)
   
   def render(self, colors=None):
     flat = self.reshape(-1)

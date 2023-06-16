@@ -12,7 +12,7 @@ from geometry_grid.torch_geometry.typecheck import typechecked
 
 
 @typechecked
-def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
+def around_tubes(tubes:torch_geom.Tube, n:int, point_std:float = 0.01):
   i = torch.randint(low=0, high=tubes.batch_shape[0], 
     size=(int(n),), device=tubes.device)
 
@@ -20,7 +20,7 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_var:float = 0.01):
   segments = tubes.segment
 
   t = torch.rand((n,), device=segments.device) 
-  p = torch.randn(n, 3, device=segments.device) * point_var
+  p = torch.randn(n, 3, device=segments.device) * point_std
 
   d = segments.unit_dir
 
