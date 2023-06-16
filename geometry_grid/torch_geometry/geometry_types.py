@@ -294,7 +294,12 @@ class Tube(TensorClass):
         self.segment.bounds)
   
   def render(self, colors=None):
-    return render.tube_loops(self.segment.a, self.segment.b, self.radii, colors=colors)
+    flat = self.reshape(-1)
+    def to_mesh(tube:Tube):
+      return render.tube_mesh(points = torch.stack([tube.segment.a, tube.segment.b]), 
+            radii=tube.radii, n=10)
+
+    return render.concat_mesh([to_mesh(flat[i]) for i in range(flat.batch_shape[0])])
 
 if __name__=="__main__":
   seg1 = Segment(torch.tensor([[0.0, -1.0, 0.0]]), torch.tensor([[0.0, 1.0, 0.0]]), convert_types=True)

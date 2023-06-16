@@ -281,9 +281,9 @@ class Tube:
 
   @ti.func
   def radius_at(self, t:ti.f32):
-    return self.r[0] + t * (self.r[1]- self.r[0])
+    return self.radii[0] + t * (self.radii[1]- self.radii[0])
 
-
+  @ti.func
   def point_distance(self, p:vec3):
     t, dist_sq = self.segment.point_dist_sq(p)
     r = self.radius_at(t)
@@ -313,17 +313,17 @@ class Tube:
     
   @ti.func
   def intersects_box(self, box:ti.template()):
-    if self.segment.box_intersections(box):
-      return True
+    
+    intersects = self.segment.intersects_box(box)
 
     for e in ti.static(box.edges()):
       if self.segment_distance(e) <= 0.:
-        return True
+        intersects = True
 
     d1 = box.distance(self.segment.a)
     d2 = box.distance(self.segment.b)
 
-    return d1 < self.r[0] or d2 < self.r[1]
+    return intersects or (d1 < self.radii[0]) or (d2 < self.radii[1])
   
 
   def approx_intersects_box(self, box:AABox):

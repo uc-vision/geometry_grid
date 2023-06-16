@@ -108,7 +108,7 @@ def struct_size(ti_struct:ti.lang.struct.StructType):
 @typechecked
 def tensorclass_field(data:TensorClass, dtype:ti.lang.struct.StructType):
   if data.shape_info != taichi_shape(dtype):
-    raise TypeError(f"Expected shapes don't match:\n{data.shape_info}\n{taichi_shape(dtype)}")
+    raise TypeError(f"Expected shapes don't match for {data.__class__.__name__}:\n{data.shape_info} and \n{taichi_shape(dtype)}")
 
   field = dtype.field(shape=data.batch_shape)
   field.from_torch(asdict(data))

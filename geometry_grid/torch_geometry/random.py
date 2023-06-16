@@ -51,8 +51,8 @@ def random_segments(bounds:torch_geom.AABox,
 
 
 
-def random_tubes(segments:torch_geom.Segment, radius_range:Tuple[float, float]=(0.1, 0.25), n:int=100):
-  radii = torch.rand(n, 2, device=segments.device) * radius_range[1] + radius_range[0]
+def random_tubes(segments:torch_geom.Segment, radius_range:Tuple[float, float]=(0.1, 0.25)):
+  radii = torch.rand((*segments.batch_shape, 2), device=segments.device) * radius_range[1] + radius_range[0]
 
   return torch_geom.Tube(segments, radii)
 
