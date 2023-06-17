@@ -14,11 +14,10 @@ class PointQuery:
 
   distance: ti.f32
   index: ti.i32
-  comparisons: ti.i32
 
   @ti.func
-  def update(self, index, other):
-    d = other.point_distance(self.point)
+  def update(self, index, obj):
+    d = obj.point_distance(self.point)
     if d < self.max_distance:
       old = ti.atomic_min(self.distance, d)
       if old != self.distance:
@@ -40,7 +39,7 @@ def _point_query(object_grid:ti.template(),
   
   for i in range(points.shape[0]):
     q = PointQuery(points[i], max_distance, distance=torch.inf, index=-1)
-    object_grid._query_grid(q)
+    object_grid._query_grid(q, q.bounds())
 
     distances[i] = q.distance
     indexes[i] = q.index

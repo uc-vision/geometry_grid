@@ -16,5 +16,3 @@ def unpack_index(p:ti.u64) -> FloatIndex:
   return FloatIndex(
     ti.cast(p >> 32, ti.u32), 
     ti.bit_cast(f, ti.f32))
-
-

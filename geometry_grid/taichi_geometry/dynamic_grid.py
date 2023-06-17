@@ -4,6 +4,7 @@ from geometry_grid.taichi_geometry.conversion import from_torch
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi_geometry.field import block_bitmask, placed_field
+from geometry_grid.taichi_geometry.geometry_types import AABox
 
 from geometry_grid.taichi_geometry.grid import Grid
 
