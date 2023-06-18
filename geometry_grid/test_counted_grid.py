@@ -1,18 +1,17 @@
 
 
-from pathlib import Path
-import gc
 from typing import Tuple
-from geometry_grid.taichi_geometry.counted_grid import CountedGrid
+from geometry_grid import taichi_geometry
 from geometry_grid.taichi_geometry.geometry_types import AABox
 from geometry_grid.torch_geometry.random import random_segments
 
 import taichi as ti
 import torch
-from geometry_grid.taichi_geometry.point_query import build_grid_points_query
+from geometry_grid.taichi_geometry.point_query import point_query
 
+from geometry_grid.taichi_geometry.counted_grid import CountedGrid
+from geometry_grid.taichi_geometry.transposed_query import build_grid_points_query
 from geometry_grid.taichi_geometry.grid import Grid
-from geometry_grid.taichi_geometry.dynamic_grid import DynamicGrid
 
 import geometry_grid.torch_geometry as torch_geom
 from tqdm import tqdm
@@ -60,26 +59,27 @@ if __name__ == "__main__":
   bounds = tubes.bounds.union_all()
 
   point_std = 0.05
-  points = torch_geom.around_tubes(tubes, n=1000000, point_std=point_std)
+  points = torch_geom.around_tubes(tubes, n=10000, point_std=point_std)
 
   print("Generate grid...")
-  dyn_grid = DynamicGrid.from_torch(
+  grid = CountedGrid.from_torch(
     # Grid.fixed_cell(bounds,  1.0), 
-    Grid.fixed_size(bounds, (16, 16, 16)), 
-    tubes,  max_occupied=64)
+    Grid.fixed_size(bounds, (32, 32, 32)), 
+    torch_geom.Point(points))
 
-  print("Grid size: ", dyn_grid.grid.size)
-  cells, counts = dyn_grid.active_cells()
+  print("Grid size: ", grid.grid.size)
+  cells, counts = grid.active_cells()
   
+  query_points = build_grid_points_query(grid, taichi_geometry.Tube)
+
   print("Query index...")
   pbar = tqdm(range(10))
   for i in pbar:
-    dist, idx = point_query(dyn_grid.index, points, 20.0)
+    dist, idx = query_points(tubes, 20.0)
     pbar.set_description(f"n={(idx >= 0.0).sum().item()}")
 
 
-
-  display_distances(tubes, dyn_grid.grid.get_boxes(cells), 
+  display_distances(tubes, grid.grid.get_boxes(cells), 
                     points, dist / (point_std * 3))
 
 

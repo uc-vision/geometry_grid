@@ -11,14 +11,15 @@ from geometry_grid.taichi_geometry import atomic, conversion
 
 from tensorclass import TensorClass
 
-def query_points(ti_struct:ti.lang.struct.StructType, object_grid):
+@beartype
+def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
   n = conversion.struct_size(ti_struct)
   obj_vec = ti.types.vector(n, dtype=ti.f32)
 
-  num_points = object_grid.objects.shape[0]
+  num_points = point_grid.objects.shape[0]
   packed_dist = ti.field(dtype=ti.u64, shape=(num_points,))
 
-  @ti.struct 
+  @ti.dataclass 
   class QueryPoints:
     obj:ti_struct
     index:ti.i32
@@ -45,14 +46,16 @@ def query_points(ti_struct:ti.lang.struct.StructType, object_grid):
       indexes:ndarray(ti.i32, ndim=1)): 
     
     for i in range(packed_dist.shape[0]):
-      packed_dist[i] = atomic.pack_index(-1, torch.inf)
+      packed_dist[i] = atomic.pack_index(atomic.FloatIndex(-1, torch.inf))
     
     for i in range(objs.shape[0]):
       q = QueryPoints(obj=objs[i], index=i, max_distance=max_distance)
-      object_grid._query_grid(q)
+      point_grid._query_grid(q)
 
     for i in range(packed_dist.shape[0]):
-      distances[i], indexes[i] = atomic.unpack_index(packed_dist[i])
+      index = atomic.unpack_index(packed_dist[i])
+      distances[i] = index.distance
+      indexes[i] = index.index
 
   @beartype
   def f(objs:TensorClass, max_distance:float) -> Tuple[NInt32, NFloat32]:
@@ -60,6 +63,7 @@ def query_points(ti_struct:ti.lang.struct.StructType, object_grid):
 
     distances = torch.empty((num_points,), device=objs.device, dtype=torch.float32)
     indexes = torch.empty_like(distances, dtype=torch.int32)
+    
     _query_points(objs.flat(), max_distance, distances, indexes)
 
     return distances, indexes

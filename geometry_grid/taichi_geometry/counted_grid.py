@@ -5,7 +5,7 @@ from geometry_grid.taichi_geometry.field import placed_field
 
 from geometry_grid.taichi_geometry.grid import Grid
 from tensorclass import TensorClass
-from typeguard import typechecked
+from beartype import beartype
 
 import torch
 from .conversion import from_torch
@@ -47,7 +47,7 @@ class CountedGrid:
     self.device = device
 
 
-  @typechecked
+  @beartype
   def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8): 
     return CountedGrid(grid, from_torch(objects), 
       grid_chunk,  device=objects.device)
@@ -113,7 +113,7 @@ class CountedGrid:
     for _ in ti.grouped(self.cells):
       total_cells += 1
 
-    return ti.math.vec2(total_cells, total_entries)
+    return ti.math.ivec2(total_cells, total_entries)
 
 
   @ti.func

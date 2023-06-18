@@ -90,7 +90,7 @@ def taichi_shape(ti_type):
     return (1, taichi_torch[ti_type.dtype])
 
 
-
+@beartype
 def struct_size(ti_struct:ti.lang.struct.StructType):
   size = 0
   for k, v in ti_struct.members.items():
