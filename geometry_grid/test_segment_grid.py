@@ -53,18 +53,18 @@ if __name__ == "__main__":
   torch.manual_seed(0)  
 
   segs = torch_geom.random_segments(torch_geom.AABox.from_to(0, 10, device=device), 
-                                    length_range=(0.5, 3), n=20).to(device)
-  tubes = torch_geom.random_tubes(segs, radius_range=(0.1, 0.3))
+                                    length_range=(0.5, 3.0), n=20).to(device)
+  tubes = torch_geom.random_tubes(segs, radius_range=(0.1, 0.2))
 
   bounds = tubes.bounds.union_all()
 
   point_std = 0.05
-  points = torch_geom.around_tubes(tubes, n=1000000, point_std=point_std)
+  points = torch_geom.around_tubes(tubes, n=10000, point_std=point_std)
 
   print("Generate grid...")
   grid = DynamicGrid.from_torch(
-    Grid.fixed_cell(bounds,  1.0), 
-    # Grid.fixed_size(skeleton.bounds, (64, 64, 64)), 
+    # Grid.fixed_cell(bounds,  1.0), 
+    Grid.fixed_size(bounds, (64, 64, 64)), 
     tubes,  max_occupied=64)
 
   print("Grid size: ", grid.grid.size)
@@ -78,6 +78,7 @@ if __name__ == "__main__":
 
 
 
-  display_distances(tubes, grid.grid.get_boxes(cells), points, dist / (point_std * 3))
+  display_distances(tubes, grid.grid.get_boxes(cells), 
+                    points, dist / (point_std * 3))
 
 

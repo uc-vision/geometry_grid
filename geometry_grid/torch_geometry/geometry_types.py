@@ -301,7 +301,7 @@ class Tube(TensorClass):
     flat = self.reshape(-1)
     def to_mesh(tube:Tube):
       return render.tube_mesh(points = torch.stack([tube.segment.a, tube.segment.b]), 
-            radii=tube.radii, n=10)
+            radii=tube.radii, n=20)
 
     return render.concat_mesh([to_mesh(flat[i]) for i in range(flat.batch_shape[0])])
 

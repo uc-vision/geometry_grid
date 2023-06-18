@@ -101,10 +101,11 @@ class AABox:
     )
 
   @ti.func 
-  def distance(self, p:vec3):
+  def point_distance(self, p:vec3):
     d = vec3(0.)
     for i in ti.static(range(3)):
-      d[i] +=  ti.max(0., p[i] - self.lower[i]) + ti.max(0., p[i] - self.upper[i])
+      d[i] +=  ti.max(0., self.lower[i] - p[i]) + ti.max(0., p[i] - self.upper[i])
+
     return ti.sqrt(tm.dot(d, d))
 
 
@@ -224,8 +225,8 @@ class Segment:
   def box_distance(self, box:ti.template()):
     ds = [self.segment_distance(e) for e in ti.static(box.edges())]
 
-    d1 = box.distance(self.a)
-    d2 = box.distance(self.b)
+    d1 = box.point_distance(self.a)
+    d2 = box.point_distance(self.b)
 
     return ti.select(self.intersects_box(box), 0, ti.min(*ds, d1, d2))
 
@@ -315,15 +316,17 @@ class Tube:
   def intersects_box(self, box:ti.template()):
     
     intersects = self.segment.intersects_box(box)
+    edges_intersect = False
 
     for e in ti.static(box.edges()):
       if self.segment_distance(e) <= 0.:
-        intersects = True
+        edges_intersect = True
 
-    d1 = box.distance(self.segment.a)
-    d2 = box.distance(self.segment.b)
+    d1 = box.point_distance(self.segment.a)
+    d2 = box.point_distance(self.segment.b)
 
-    return intersects or (d1 < self.radii[0]) or (d2 < self.radii[1])
+    return (edges_intersect or intersects or
+      (d1 < self.radii[0]) or (d2 < self.radii[1]))
   
 
   def approx_intersects_box(self, box:AABox):
