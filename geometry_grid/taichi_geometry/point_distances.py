@@ -5,44 +5,30 @@ import torch
 
 from geometry_grid.torch_geometry.random import random_segments
 
-from geometry_grid.taichi_geometry.conversion import check_conversion, converts_to, from_torch, struct_size
+from geometry_grid.taichi_geometry.conversion import\
+    check_conversion, converts_to, from_torch, struct_size, from_vec
 
 from taichi.math import vec3
 
 from geometry_grid.torch_geometry.typecheck import typechecked
 from tensorclass import TensorClass
-
-@ti.func 
-def atomic_min_index(dist:ti.f32, index:ti.int32, 
-    prev_dist:ti.f32, prev_index:ti.int32):
-  old = ti.atomic_min(prev_dist, dist)
-  if old == prev_dist:
-    dist = prev_dist
-    index = prev_index    
-  return dist, index
-
-@ti.func
-def from_vec(obj_struct:ti.template(), vec:ti.template()):
-  obj = obj_struct()
-  obj.from_vec(vec)
-  return obj
-  
+from . import atomic
 
 
 
 @ti.func
 def _min_point_objects(point:ti.math.vec3, radius:ti.f32,
                         obj_struct:ti.template(), obj_arr:ti.template()):
-    min_d = torch.inf
-    index = -1
+    index = atomic.unpack_index(-1, torch.inf)
 
     for i in range(obj_arr.shape[0]):
       obj = from_vec(obj_struct, obj_arr[i])
       d = obj.point_distance(point)
+      
       if d < radius:
-        min_d, index = atomic_min_index(d, i, min_d, index)
+        atomic.atomic_min(index, d, i)
 
-    return min_d, index
+    return atomic.unpack_index(index)
 
 def flat_type(obj_struct, objects):
   check_conversion(objects, obj_struct)
@@ -96,6 +82,10 @@ def pairwise_distances(objects:TensorClass, points:torch.Tensor):
   k(objects.flat(), points, distances)
   return distances
 
+
+def grad_like(t):
+  return torch.zeros_like(t.grad) if t.grad is not None else None
+
 def pairwise_distance_func(obj_struct):
   kernel =  pairwise_distances_kernel(obj_struct)
 
@@ -114,23 +104,27 @@ def pairwise_distance_func(obj_struct):
     def backward(ctx, grad_output):
         objects, points, distances = ctx.saved_tensors
 
-        distances.grad = grad_output
-        print("backward")
+        distances.grad = grad_output.contiguous()
         kernel.grad(objects, points, distances)
-        print("after")
         
-        return objects.grad, points.grad
+        return grad_like(objects), grad_like(points)
     
   return PointDistance.apply
 
 if __name__ == "__main__":
-  ti.init(debug=True)
+  ti.init(arch=ti.gpu, debug=True)
 
   import geometry_grid.torch_geometry.geometry_types as torch_geom
   import geometry_grid.taichi_geometry.geometry_types as ti_geom
 
-  segs = torch_geom.Segment(torch.randn(10, 3), torch.randn(10, 3))
-  points = torch.randn(10, 3).requires_grad_(True)
+  a = torch.randn(10, 3, requires_grad=True, device='cuda')
+
+  segs = torch_geom.Segment(a, torch.randn(10, 3)).to(device='cuda')
+  points = torch.randn(10, 3).to(device='cuda')
+
+  segs = segs.requires_grad_(True)
+  points.requires_grad = True
+
 
   distance_func = pairwise_distance_func(ti_geom.Segment)
   distances = distance_func(segs.flat(), points)
@@ -138,4 +132,5 @@ if __name__ == "__main__":
   loss = distances.sum()
   loss.backward()
 
-  print(loss)
+
+  print(loss, points.grad, segs.a.grad)

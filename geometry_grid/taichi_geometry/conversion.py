@@ -44,6 +44,13 @@ def from_tensor(x:torch.Tensor, dtype=None):
   v.from_torch(x)
   return v
 
+@ti.func
+def from_vec(obj_struct:ti.template(), vec:ti.template()):
+  obj = obj_struct()
+  obj.from_vec(vec)
+  return obj
+  
+
 
 
 def _check_shape(data_name, struct_shape, ti_struct:ti.lang.struct.StructType):

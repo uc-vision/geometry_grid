@@ -7,7 +7,7 @@ from tensorclass import TensorClass
 
 
 NInt32 = Int32[Tensor, 'N']
-NFloat32 = Int32[Tensor, 'N']
+NFloat32 = Float32[Tensor, 'N']
 
 
 NVec1 = Float32[Tensor, 'N 1']

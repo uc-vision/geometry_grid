@@ -128,6 +128,7 @@ class CountedGrid:
   @ti.func
   def _query_grid(self, query:ti.template()):
     ranges = self.grid.grid_ranges(query.bounds())
+
     for i in ti.grouped(ti.ndrange(*ranges)):
         self._query_cell(i, query)
 

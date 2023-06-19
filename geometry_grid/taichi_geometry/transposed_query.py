@@ -6,7 +6,7 @@ import torch
 
 from geometry_grid.torch_geometry.typecheck import NFloat32, NInt32
 
-from .geometry_types import AABox
+from .geometry_types import AABox, Point
 from geometry_grid.taichi_geometry import atomic, conversion
 
 from tensorclass import TensorClass
@@ -26,12 +26,12 @@ def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
     max_distance:ti.f32
 
     @ti.func
-    def update(self, index, point):
-      d = self.obj.point_distance(point)
+    def update(self, index:ti.i32, point:Point):
+      d = self.obj.point_distance(point.p)
       
       if d < self.max_distance:
-        packed = atomic.pack_index(self.index, d)
-        ti.atomic_min(packed_dist[index], packed)
+        p = atomic.pack_index(self.index, d)
+        ti.atomic_min(packed_dist[index], p)
         
     @ti.func
     def bounds(self) -> AABox:
@@ -46,26 +46,26 @@ def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
       indexes:ndarray(ti.i32, ndim=1)): 
     
     for i in range(packed_dist.shape[0]):
-      packed_dist[i] = atomic.pack_index(atomic.FloatIndex(-1, torch.inf))
+      packed_dist[i] = atomic.pack_index(-1, torch.inf)
     
     for i in range(objs.shape[0]):
-      q = QueryPoints(obj=objs[i], index=i, max_distance=max_distance)
+      obj = conversion.from_vec(ti_struct, objs[i])
+
+      q = QueryPoints(obj=obj, index=i, max_distance=max_distance)
       point_grid._query_grid(q)
 
     for i in range(packed_dist.shape[0]):
-      index = atomic.unpack_index(packed_dist[i])
-      distances[i] = index.distance
-      indexes[i] = index.index
+      indexes[i], distances[i] = atomic.unpack_index(packed_dist[i])
+
 
   @beartype
-  def f(objs:TensorClass, max_distance:float) -> Tuple[NInt32, NFloat32]:
+  def f(objs:TensorClass, max_distance:float) -> Tuple[NFloat32, NInt32]:
     conversion.check_conversion(objs, ti_struct)
 
     distances = torch.empty((num_points,), device=objs.device, dtype=torch.float32)
     indexes = torch.empty_like(distances, dtype=torch.int32)
     
     _query_points(objs.flat(), max_distance, distances, indexes)
-
-    return distances, indexes
+    return (distances, indexes)
 
   return f

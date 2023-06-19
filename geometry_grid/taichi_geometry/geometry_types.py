@@ -13,6 +13,11 @@ class Sphere:
     radius: ti.f32
 
     @ti.func
+    def from_vec(self, vec:tm.vec4):
+      self.center = vec3(vec.x, vec.y, vec.z)
+      self.radius = vec.w
+
+    @ti.func
     def area(self):
         # a function to run in taichi scope
         return 4 * np.pi * self.radius * self.radius
@@ -36,6 +41,10 @@ class Point:
     p: vec3
 
     @ti.func
+    def from_vec(self, vec:tm.vec3):
+      self.p = vec
+
+    @ti.func
     def intersects_box(self, box:ti.template()):
       return box.contains(self.p)
 
@@ -56,6 +65,12 @@ class AABox:
 
   lower: vec3
   upper: vec3
+
+  @ti.func
+  def from_vec(self, vec:ti.types.vector(6, ti.f32)):
+    self.lower = vec[0:3]
+    self.upper = vec[3:6]
+
 
   @ti.func
   def expand(self, d:ti.f32):
@@ -244,6 +259,12 @@ class Line:
   p: vec3
   dir: vec3
 
+
+  @ti.func
+  def from_vec(self, vec:ti.types.vector(6, ti.f32)):
+    self.p = vec[:3]
+    self.dir = vec[3:]
+
   @ti.func
   def line_closest(line1, line2:ti.template(), eps=1e-8) -> vec2:    
     v21 = line2.p - line1.p
@@ -279,6 +300,11 @@ class Tube:
   
   segment: Segment
   radii: vec2
+
+  @ti.func
+  def from_vec(self, vec:ti.types.vector(8, ti.f32)):
+    self.segment.from_vec(vec[:6])
+    self.radii = vec[6:]
 
   @ti.func
   def radius_at(self, t:ti.f32):
