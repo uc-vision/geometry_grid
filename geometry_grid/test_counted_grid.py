@@ -39,12 +39,12 @@ if __name__ == "__main__":
   device = torch.device(args.device)
   torch.manual_seed(0)  
 
-  segs = torch_geom.random_segments(torch_geom.AABox.from_to(0, 10, device=device), 
-                                    length_range=(0.5, 3.0), n=1000).to(device)
-  tubes = torch_geom.random_tubes(segs, radius_range=(0.1, 0.2))
+  segs = torch_geom.random_segments(torch_geom.AABox.from_to(0, 50, device=device), 
+                                    length_range=(0.5, 5.0), n=10000).to(device)
+  tubes = torch_geom.random_tubes(segs, radius_range=(0.1, 0.4))
 
 
-  point_std = 0.05
+  point_std = 0.1
   points = torch_geom.around_tubes(tubes, n=1000000, point_std=point_std)
   points = morton_sort(points, n=256)
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
   print("Generate grid...")
   grid = CountedGrid.from_torch(
     # Grid.fixed_cell(bounds,  1.0), 
-    Grid.fixed_size(bounds, (64, 64, 64)), 
+    Grid.fixed_size(bounds, (32, 32, 32)), 
     torch_geom.Point(points))
 
   print("Grid size: ", grid.grid.size)
