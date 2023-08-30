@@ -1,5 +1,6 @@
 
 import dataclasses
+from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, vec2
 import taichi.math as tm
@@ -56,6 +57,10 @@ class Point:
     def point_distance(self, p:vec3):
       return (p - self.p).norm()
 
+    @ti.func 
+    def nearest_point(self, p:vec3):
+      d = (p - self.p).norm()
+      return d, self.p
 
 bvec3 = ti.types.vector(3, bool)
 
