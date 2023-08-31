@@ -1,6 +1,6 @@
 from typing import Tuple
 import taichi as ti
-from taichi.math import vec3
+from taichi.math import vec3, normalize
 from taichi.types import ndarray
 import torch
 
@@ -19,9 +19,9 @@ class AttractQuery:
   def update(self, _, obj):
     d, p = obj.nearest_point(self.point)
 
-    if d < self.max_distance and d > 0.:
+    if d < self.max_distance and d > 1e-6:
       v = p - self.point 
-      self.force += v * (self.attenuation / d)**2
+      self.force += normalize(v) * ti.min(1, self.attenuation / d)
 
 
 
@@ -45,14 +45,16 @@ def _attract_query(object_grid:ti.template(),
     forces[i] = q.force
 
 
-def attract_query (object_grid, points:torch.Tensor, attenuation:ti.f32, max_distance:float) -> torch.FloatTensor:
+def attract_query (object_grid, points:torch.Tensor, 
+                   attenuation:ti.f32, max_distance:float) -> torch.FloatTensor:
   """ 
     Compute an attraction/repulsion force on each point due to the objects in the grid.
-    force = sum(  (attenuation / |v|)^2 *  v )
+    force = sum(  (attenuation / |v|) *  v/|v| )
 
   """
 
-  forces = torch.zeros((points.shape[0], 3), device=points.device, dtype=torch.float32)
+  forces = torch.zeros((points.shape[0], 3), 
+                       device=points.device, dtype=torch.float32)
 
   _attract_query(object_grid, points, attenuation, max_distance, forces)
   return forces

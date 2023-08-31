@@ -2,6 +2,7 @@ from functools import cache
 import taichi as ti
 from taichi.types import ndarray
 import torch
+from geometry_grid.functional.util import clear_grad
 
 from geometry_grid.torch_geometry.random import random_segments
 
@@ -50,7 +51,7 @@ def min_distances_kernel(obj_struct):
   return k
 
 @typechecked
-def min_point_object(objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
+def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   indexes = torch.full_like(distances, -1, dtype=torch.int32)
 
@@ -60,7 +61,7 @@ def min_point_object(objects:TensorClass, points:torch.Tensor, max_distance:floa
   return distances, indexes
 
 @cache
-def pairwise_distances_kernel(obj_struct):
+def batch_distances_kernel(obj_struct):
   size = struct_size(obj_struct)
 
   @ti.kernel
@@ -73,64 +74,23 @@ def pairwise_distances_kernel(obj_struct):
   return k
 
 
-def pairwise_distances(objects:TensorClass, points:torch.Tensor):
+def batch_distances(objects:TensorClass, points:torch.Tensor):
   assert objects.batch_shape[0] == points.shape[0]
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
 
-  k = pairwise_distances_kernel(converts_to(objects))
+  k = batch_distances_kernel(converts_to(objects))
 
   k(objects.flat(), points, distances)
   return distances
 
 
-def grad_like(t):
-  return torch.zeros_like(t.grad) if t.grad is not None else None
+def batch_distances_grad(objects:TensorClass, points:torch.Tensor, distances:torch.Tensor):
+  assert objects.batch_shape[0] == points.shape[0]
 
-def pairwise_distance_func(obj_struct):
-  kernel =  pairwise_distances_kernel(obj_struct)
+  k = batch_distances_kernel(converts_to(objects))
+  obj_vec = objects.flat()
 
-  class PointDistance(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, objects:torch.Tensor, points:torch.Tensor):
+  with clear_grad(obj_vec, points, distances):
+    k.grad(obj_vec, points, distances)
 
-        distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
-        kernel(objects, points, distances)
-
-        ctx.save_for_backward(objects, points, distances)
-
-        return distances
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        objects, points, distances = ctx.saved_tensors
-
-        distances.grad = grad_output.contiguous()
-        kernel.grad(objects, points, distances)
-        
-        return grad_like(objects), grad_like(points)
-    
-  return PointDistance.apply
-
-if __name__ == "__main__":
-  ti.init(arch=ti.gpu, debug=True)
-
-  import geometry_grid.torch_geometry.geometry_types as torch_geom
-  import geometry_grid.taichi_geometry.geometry_types as ti_geom
-
-  a = torch.randn(10, 3, requires_grad=True, device='cuda')
-
-  segs = torch_geom.Segment(a, torch.randn(10, 3)).to(device='cuda')
-  points = torch.randn(10, 3).to(device='cuda')
-
-  segs = segs.requires_grad_(True)
-  points.requires_grad = True
-
-
-  distance_func = pairwise_distance_func(ti_geom.Segment)
-  distances = distance_func(segs.flat(), points)
-
-  loss = distances.sum()
-  loss.backward()
-
-
-  print(loss, points.grad, segs.a.grad)
+  return objects.from_vec(obj_vec.grad), points.grad

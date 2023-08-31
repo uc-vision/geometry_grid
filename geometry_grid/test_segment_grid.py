@@ -1,12 +1,4 @@
-
-
-from pathlib import Path
-import gc
-from typing import Tuple
 from geometry_grid.render_util import display_distances
-from geometry_grid.taichi_geometry.counted_grid import CountedGrid
-from geometry_grid.taichi_geometry.geometry_types import AABox
-from geometry_grid.torch_geometry.random import random_segments
 
 import taichi as ti
 import torch
@@ -17,11 +9,6 @@ from geometry_grid.taichi_geometry.dynamic_grid import DynamicGrid
 
 import geometry_grid.torch_geometry as torch_geom
 from tqdm import tqdm
-
-
-from open3d_vis import render
-import open3d as o3d
-
 
 
 if __name__ == "__main__":

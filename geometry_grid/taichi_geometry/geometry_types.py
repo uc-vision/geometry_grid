@@ -191,11 +191,11 @@ class Segment:
     return AABox(ti.min(self.a, self.b), ti.max(self.a, self.b))
 
   @ti.func
-  def point_dist_sq(self, p:vec3, eps=1e-6):
+  def point_dist_sq(self, p:vec3, eps=1e-8):
     d = self.dir()
-    l2 = tm.dot(d, d)  # |b - a|^2
+    l2 = tm.dot(d, d)   # |b - a|^2
 
-    t = tm.clamp(tm.dot(d, (p - self.a) / l2), 0., 1.)
+    t = tm.clamp(tm.dot(d, (p - self.a) / (l2 + eps)), 0., 1.)
     p_proj = self.a + t * d
     delta_p = p_proj - p
 

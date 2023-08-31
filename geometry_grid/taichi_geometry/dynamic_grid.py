@@ -138,7 +138,6 @@ class DynamicGrid:
       i = ti.atomic_add(count, 1)
       v = ivec3(cell)
       cells[i] = v
-      
       counts[i] = self.occupied[v.x, v.y, v.z].length()
 
 
