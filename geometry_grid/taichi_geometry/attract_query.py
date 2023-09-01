@@ -10,7 +10,7 @@ from .geometry_types import AABox
 @ti.dataclass
 class AttractQuery:
   point: vec3
-  attenuation: ti.f32
+  sigma: ti.f32
   max_distance: ti.f32
 
   force: vec3
@@ -21,7 +21,9 @@ class AttractQuery:
 
     if d < self.max_distance and d > 1e-6:
       v = p - self.point 
-      self.force += normalize(v) * ti.min(1, self.attenuation / d)
+      l = ti.math.length(v)
+      
+      self.force += v * ti.exp(- (l / self.sigma)**2) / l
 
 
 
@@ -46,17 +48,17 @@ def _attract_query(object_grid:ti.template(),
 
 
 def attract_query (object_grid, points:torch.Tensor, 
-                   attenuation:ti.f32, max_distance:float) -> torch.FloatTensor:
+                   sigma:ti.f32, max_distance:float) -> torch.FloatTensor:
   """ 
     Compute an attraction/repulsion force on each point due to the objects in the grid.
-    force = sum(  (attenuation / |v|) *  v/|v| )
+    force = exp(-(|v| / sigma)^2) * v / |v|
 
   """
 
   forces = torch.zeros((points.shape[0], 3), 
                        device=points.device, dtype=torch.float32)
 
-  _attract_query(object_grid, points, attenuation, max_distance, forces)
+  _attract_query(object_grid, points, sigma, max_distance, forces)
   return forces
 
 

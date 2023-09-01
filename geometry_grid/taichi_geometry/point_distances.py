@@ -57,7 +57,7 @@ def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=t
 
   k = min_distances_kernel(converts_to(objects))
 
-  k(objects.flat(), points, max_distance, distances, indexes)
+  k(objects.to_vec(), points, max_distance, distances, indexes)
   return distances, indexes
 
 @cache
@@ -80,17 +80,18 @@ def batch_distances(objects:TensorClass, points:torch.Tensor):
 
   k = batch_distances_kernel(converts_to(objects))
 
-  k(objects.flat(), points, distances)
+  k(objects.to_vec(), points, distances)
   return distances
 
 
-def batch_distances_grad(objects:TensorClass, points:torch.Tensor, distances:torch.Tensor):
+def batch_distances_grad(objects:TensorClass, points:torch.Tensor, distances:torch.Tensor, distances_grad:torch.Tensor):
   assert objects.batch_shape[0] == points.shape[0]
 
   k = batch_distances_kernel(converts_to(objects))
-  obj_vec = objects.flat()
+  obj_vec = objects.to_vec()
 
   with clear_grad(obj_vec, points, distances):
+    distances.grad = distances_grad.contiguous()
     k.grad(obj_vec, points, distances)
 
-  return objects.from_vec(obj_vec.grad), points.grad
+    return objects.from_vec(obj_vec.grad), points.grad

@@ -65,7 +65,7 @@ def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
     distances = torch.empty((num_points,), device=objs.device, dtype=torch.float32)
     indexes = torch.empty_like(distances, dtype=torch.int32)
     
-    _query_points(objs.flat(), max_distance, distances, indexes)
+    _query_points(objs.to_vec(), max_distance, distances, indexes)
     return (distances, indexes)
 
   return f
