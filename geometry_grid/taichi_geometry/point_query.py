@@ -14,12 +14,12 @@ class PointQuery:
 
   distance: ti.f32
   index: ti.i32
-  allow_zero: ti.f32
+  allow_zero: bool
 
   @ti.func
   def update(self, index, obj):
     d = obj.point_distance(self.point)
-    if d < self.max_distance and (d > 0. or self.allow_zero):
+    if d < self.max_distance and ((d > 0.) or self.allow_zero):
       old = ti.atomic_min(self.distance, d)
       if old != self.distance:
         self.index = index

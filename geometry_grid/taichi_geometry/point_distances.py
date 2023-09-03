@@ -79,7 +79,6 @@ def batch_distances(objects:TensorClass, points:torch.Tensor):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
 
   k = batch_distances_kernel(converts_to(objects))
-
   k(objects.to_vec(), points, distances)
   return distances
 
@@ -90,8 +89,30 @@ def batch_distances_grad(objects:TensorClass, points:torch.Tensor, distances:tor
   k = batch_distances_kernel(converts_to(objects))
   obj_vec = objects.to_vec()
 
+  if points.grad is None:
+    # points.grad = torch.zeros_like(points)
+    # obj_vec.grad = torch.zeros_like(obj_vec)
+
+    points.requires_grad_(True)
+    # obj_vec.requires_grad_(True)
+    distances.requires_grad_(True)
+
+  # print(distances.sum())
+  # k(obj_vec, points, distances)
+  # print(distances.sum())
+  # q = distances.sum().backward()
+
   with clear_grad(obj_vec, points, distances):
     distances.grad = distances_grad.contiguous()
+    
     k.grad(obj_vec, points, distances)
 
-    return objects.from_vec(obj_vec.grad), points.grad
+    if obj_vec.grad is not None:
+      obj_grad = objects.from_vec(obj_vec.grad)
+    else:
+      obj_grad = None
+    
+    print("????", points.grad.sum())
+    print(obj_vec.grad.sum())
+
+    return obj_grad, points.grad

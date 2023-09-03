@@ -3,7 +3,7 @@ import torch
 from geometry_grid.taichi_geometry.conversion import converts_to
 
 from geometry_grid.taichi_geometry.point_distances import (
-  batch_distances, batch_distances_grad)
+  batch_distances_kernel)
 from .util import clear_grad
 
 import taichi as ti
@@ -11,30 +11,35 @@ from tensorclass import TensorClass
 
 from functools import cache
 
-class BatchDistances(torch.autograd.Function):
-  @staticmethod
-  def forward(ctx, objects:TensorClass, points:torch.Tensor):
 
-      distances = batch_distances(objects, points)
+def batch_distances(objects:TensorClass, points:torch.Tensor):
+  struct_type = converts_to(objects)
+  f = batch_distances_func(struct_type)
+  return f(objects.to_vec(), points)
 
-      ctx.save_for_backward(points, distances, *objects.tensors())
-      ctx.object_type = type(objects)
-      
-      return distances
+@cache
+def batch_distances_func(obj_struct):
+  kernel = batch_distances_kernel(obj_struct)
+  class BatchDistances(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, obj_vec:torch.Tensor, points:torch.Tensor):
+        distances = torch.empty((points.shape[0],), dtype=torch.float32, device=points.device)
+        kernel(obj_vec, points, distances)
+        ctx.save_for_backward(points, distances, obj_vec)        
+        return distances
 
-  @staticmethod
-  def backward(ctx, grad_output):
-      points, distances, *obj_tensors = ctx.saved_tensors
-      objects = ctx.object_type.from_tensors(obj_tensors)
+    @staticmethod
+    def backward(ctx, grad_output):
+        points, distances, obj_vec = ctx.saved_tensors
+        with clear_grad(obj_vec, points, distances):
+          distances.grad = grad_output.contiguous()
+          kernel.grad(obj_vec, points, distances)
 
-      return batch_distances_grad(objects, points, distances, grad_output)
-
-
-
+          return obj_vec.grad, points.grad
+  return BatchDistances.apply
 
 if __name__ == "__main__":
   ti.init(arch=ti.gpu, debug=True)
-
 
   import geometry_grid.torch_geometry.geometry_types as torch_geom
   import geometry_grid.taichi_geometry.geometry_types as ti_geom
@@ -50,8 +55,7 @@ if __name__ == "__main__":
   segs = segs.requires_grad_(True)
   points.requires_grad = True
 
-  distances = BatchDistances.apply(segs, points)
-
+  distances = batch_distances(segs, points)
 
   loss = distances.sum()
   loss.backward()
