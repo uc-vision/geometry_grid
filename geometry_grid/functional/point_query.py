@@ -24,11 +24,12 @@ def point_query_func(grid, max_distance, allow_zero=False):
     @staticmethod
     def backward(ctx, grad_output, indexes):
         points, distances = ctx.saved_tensors
-        obj_vec = grid.get_object_vecs(indexes)
+        obj_vec = grid.get_object_vecs(indexes).requires_grad_(True)
 
         with clear_grad(points, distances):
           distances.grad = grad_output.contiguous()
           kernel.grad(obj_vec, points, distances)
+
 
           return points.grad
   return BatchDistances.apply

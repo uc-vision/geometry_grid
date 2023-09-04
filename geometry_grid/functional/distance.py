@@ -33,7 +33,11 @@ def batch_distances_func(obj_struct):
         points, distances, obj_vec = ctx.saved_tensors
         with clear_grad(obj_vec, points, distances):
           distances.grad = grad_output.contiguous()
+          obj_vec.requires_grad_(True)
+
           kernel.grad(obj_vec, points, distances)
+
+          print(obj_vec.grad)
 
           return obj_vec.grad, points.grad
   return BatchDistances.apply
