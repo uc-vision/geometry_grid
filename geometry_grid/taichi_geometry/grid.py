@@ -82,8 +82,10 @@ class Grid:
     start = ti.floor((b.lower - lower) / inc)
     end = ti.ceil((b.upper - lower) / inc)
 
-    return (ti.cast(clamp(start, 0, self.size), ti.i32), 
-            ti.cast(clamp(end, 0, self.size), ti.i32))
+    range_start = ti.cast(clamp(start, 0, self.size), ti.i32)
+    range_end = ti.cast(clamp(end, range_start + 1, self.size), ti.i32) 
+
+    return (range_start, range_end)
 
   @ti.func 
   def grid_ranges(self, b):  

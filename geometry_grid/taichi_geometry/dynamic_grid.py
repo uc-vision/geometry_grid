@@ -31,6 +31,7 @@ class GridIndex:
     self.count = placed_field(self.sparse, ti.int32)
 
     # Flattened ragged lists of indexes into objects for each cell
+
     self.index = ti.field(ti.i32, total_entries)
     self.num_entries = total_entries
   
@@ -134,9 +135,10 @@ class DynamicGrid:
   @ti.kernel
   def _get_objects(self, indexes:ti.types.ndarray(ti.i32, ndim=1), obj_vecs:ti.types.ndarray(ndim=2)):
     for i in range(indexes.shape[0]):
-      v = self.objects[indexes[i]].to_vec()
-      for j in range(len(v)):
-        obj_vecs[i, j] = v[j]
+      if indexes[i] >= 0:
+        v = self.objects[indexes[i]].to_vec()
+        for j in range(len(v)):
+          obj_vecs[i, j] = v[j]
 
 
   def get_object_vecs(self, indexes:torch.Tensor):
@@ -191,6 +193,7 @@ class DynamicGrid:
 
 
   def update_index(self):
+
     if (self.index is None) or (self.total_entries > self.index.num_entries):
       self.index = GridIndex(self.grid, self.objects, 
         self.total_entries * 2, self.grid_chunk)

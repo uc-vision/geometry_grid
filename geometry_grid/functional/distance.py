@@ -13,6 +13,8 @@ from functools import cache
 
 
 def batch_distances(objects:TensorClass, points:torch.Tensor):
+  assert objects.batch_shape == points.shape[:1], f"batch size does not match: {objects.batch_shape} != {points.shape[:1]}"
+
   struct_type = converts_to(objects)
   f = batch_distances_func(struct_type)
   return f(objects.to_vec(), points)
@@ -36,9 +38,6 @@ def batch_distances_func(obj_struct):
           obj_vec.requires_grad_(True)
 
           kernel.grad(obj_vec, points, distances)
-
-          print(obj_vec.grad)
-
           return obj_vec.grad, points.grad
   return BatchDistances.apply
 

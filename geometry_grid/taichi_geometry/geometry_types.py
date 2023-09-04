@@ -112,8 +112,8 @@ class AABox:
         ti.max(self.upper, box.upper))
 
   @ti.func
-  def contains(self, p:vec3):
-    return (p >= self.lower).all() and (p <= self.upper).all()
+  def contains(self, p:vec3, eps=1e-6):
+    return (p >= (self.lower - eps)).all() and (p <= (self.upper + eps)).all()
 
 
   @ti.func 
@@ -279,7 +279,8 @@ class Segment:
   @ti.func
   def intersects_box(self, box:ti.template()):
     i = self.box_intersections(box)
-    return i[0] <= i[1] and i[0] <= 1 and i[1] >= 0
+
+    return (i[0] <= i[1] and i[0] <= 1 and i[1] >= 0) or box.contains(self.a)
 
 
 

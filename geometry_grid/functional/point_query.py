@@ -18,18 +18,20 @@ def point_query_func(grid, max_distance, allow_zero=False):
     @staticmethod
     def forward(ctx, points:torch.Tensor):
         distances, indexes = pq.point_query(grid, points, max_distance=max_distance, allow_zero=allow_zero)
-        ctx.save_for_backward(points, distances)        
+        ctx.save_for_backward(points, distances, indexes)       
+
         return distances, indexes
 
     @staticmethod
-    def backward(ctx, grad_output, indexes):
-        points, distances = ctx.saved_tensors
-        obj_vec = grid.get_object_vecs(indexes).requires_grad_(True)
+    def backward(ctx, grad_output, _):
+        points, distances, indexes = ctx.saved_tensors
+        obj_vec = grid.get_object_vecs(indexes)
 
         with clear_grad(points, distances):
           distances.grad = grad_output.contiguous()
           kernel.grad(obj_vec, points, distances)
 
+          points.grad[indexes < 0] = 0.0
 
           return points.grad
   return BatchDistances.apply
