@@ -169,12 +169,16 @@ _conversions = {
 }
 
 conversions = {}   
+inv_conversions = {}
+
 
 def register_conversion(torch_type:type, ti_type:ti.lang.struct.StructType):
   assert issubclass(torch_type, TensorClass)
   check_static_conversion(torch_type, ti_type)
 
   conversions[torch_type] = ti_type
+  inv_conversions[ti_type] = torch_type
+
 
 for k, v in _conversions.items():
   register_conversion(k, v)
@@ -187,6 +191,12 @@ def list_conversions():
 def converts_to(data:TensorClass):
   assert data.__class__ in conversions, f"Unsupported type {data.__class__}, options are {list_conversions()} use register_conversion"
   return conversions[data.__class__]
+
+@typechecked
+def converts_from(ti_type:ti.lang.struct.StructType) -> type:
+  assert ti_type in inv_conversions, f"Unsupported type {ti_type}"
+  return inv_conversions[ti_type]
+
 
 
 @typechecked

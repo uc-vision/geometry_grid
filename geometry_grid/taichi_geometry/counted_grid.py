@@ -8,8 +8,7 @@ from tensorclass import TensorClass
 from beartype import beartype
 
 import torch
-from .conversion import from_torch
-from taichi.types import ndarray
+from .conversion import converts_to, tensorclass_field
 
 from .dynamic_grid import block_bitmask, GridIndex
 
@@ -18,9 +17,10 @@ from .dynamic_grid import block_bitmask, GridIndex
 
 @ti.data_oriented
 class CountedGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, grid_chunk=8, device='cuda:0'):
+  def __init__(self, grid:Grid, objects:ti.Field, object_types:ti.lang.Struct, grid_chunk=8, device='cuda:0'):
     self.grid = grid
     self.objects = objects
+    self.object_types = object_types
 
     self.grid_chunk=grid_chunk
     self.grid_size_chunks = grid.size // self.grid_chunk
@@ -48,9 +48,10 @@ class CountedGrid:
 
 
   @beartype
-  def from_torch(grid:Grid, objects:TensorClass, grid_chunk=8): 
-    return CountedGrid(grid, from_torch(objects), 
-      grid_chunk,  device=objects.device)
+  def from_torch(grid:Grid, torch_objects:TensorClass, grid_chunk=8): 
+    object_types = converts_to(torch_objects)
+    objects = tensorclass_field(torch_objects, object_types)
+    return CountedGrid(grid, objects, object_types, grid_chunk, device=torch_objects.device)
 
   @ti.kernel
   def _compute_prefixes(self):
@@ -114,6 +115,10 @@ class CountedGrid:
       total_cells += 1
 
     return ti.math.ivec2(total_cells, total_entries)
+
+  @property
+  def index(self):
+    return self
 
 
   @ti.func

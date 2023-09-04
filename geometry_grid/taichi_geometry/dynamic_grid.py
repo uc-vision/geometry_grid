@@ -11,7 +11,7 @@ from geometry_grid.taichi_geometry.grid import Grid
 from geometry_grid.torch_geometry.typecheck import typechecked, TensorClass
 
 import torch
-from .conversion import check_conversion, tensorclass_field
+from .conversion import check_conversion, converts_from, converts_to, struct_size, tensorclass_field
 from taichi.types import ndarray
 
 
@@ -57,9 +57,11 @@ class GridIndex:
 
 
 
+
+
 @ti.data_oriented
 class DynamicGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, max_occupied=64, 
+  def __init__(self, grid:Grid, objects:ti.Field, object_types:ti.lang.Struct, max_occupied=64, 
     grid_chunk=8, device='cuda:0'):
 
     self.device = device
@@ -73,27 +75,28 @@ class DynamicGrid:
 
     self.grid = grid
     self.objects = objects
+    self.object_types = object_types
+
     self.index = None
 
     self.add_objects()
     
   @typechecked 
   def from_torch(grid:Grid, torch_objects:TensorClass, grid_chunk=8, max_occupied=64): 
-    objects = from_torch(torch_objects)
+    object_types = converts_to(torch_objects)
+    objects = tensorclass_field(torch_objects, object_types)
 
-    return DynamicGrid(grid, objects, 
+    return DynamicGrid(grid, objects, object_types,
       max_occupied=max_occupied, device=torch_objects.device, grid_chunk=grid_chunk)
 
 
   def update_objects(self, torch_objects:TensorClass):
-    print(self.objects._members, self.objects._name)
 
     check_conversion(torch_objects, self.objects)
     if torch_objects.batch_shape == self.objects.shape:
       self.objects.from_torch(torch_objects.asdict())
     else:
       self.objects = tensorclass_field(torch_objects, self.objects.dtype)
-
 
     self.cells.parent().deactivate_all()
     self.add_objects()
@@ -125,13 +128,36 @@ class DynamicGrid:
     
     for _ in ti.grouped(self.cells):
       total_cells += 1
-
     return ti.math.ivec2(total_cells, total_entries)
+  
+
+  @ti.kernel
+  def _get_objects(self, indexes:ti.types.ndarray(ti.i32, ndim=1), obj_vecs:ti.types.ndarray(ndim=2)):
+    for i in range(indexes.shape[0]):
+      v = self.objects[indexes[i]].to_vec()
+      for j in range(len(v)):
+        obj_vecs[i, j] = v[j]
+
+
+  def get_object_vecs(self, indexes:torch.Tensor):
+    obj_vecs = torch.empty((indexes.shape[0], struct_size(self.object_types)), 
+      device=self.device, dtype=torch.float32)
+
+    self._get_objects(indexes, obj_vecs)
+    return obj_vecs
+  
+  def get_objects(self, indexes:torch.Tensor):
+    obj_vecs = self.get_object_vecs(indexes)
+    tensorclass = converts_from(self.object_types)
+    return tensorclass.from_vec(obj_vecs)
+  
+
 
 
   @ti.kernel
   def _active_cells(self, cells:ti.types.ndarray(ivec3, ndim=1), 
-    counts:ti.types.ndarray(ti.i32, ndim=1)):
+      counts:ti.types.ndarray(ti.i32, ndim=1)):
+    
     count = 0
 
     for cell in ti.grouped(self.cells):

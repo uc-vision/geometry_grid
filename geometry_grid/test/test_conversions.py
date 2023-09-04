@@ -18,7 +18,13 @@ if __name__ == '__main__':
   boxes = torch_geom.AABox.from_points(x)
 
   f = conversion.tensorclass_field(boxes, ti_geom.AABox)
-  # f = ti.field(dtype=ti.f32, shape=(10, 17, 6))
 
   boxes2 = torch_geom.AABox(**f.to_torch())
+  assert boxes2.allclose(boxes)
+
+  x2 = torch.randn(10, 17, 3, dtype=torch.float32)
+  boxes3 = torch_geom.AABox.from_points(x2)
+
+  assert not boxes3.allclose(boxes)
+  print("Done")
 

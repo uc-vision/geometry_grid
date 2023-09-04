@@ -2,14 +2,11 @@ from functools import cache
 import taichi as ti
 from taichi.types import ndarray
 import torch
-from geometry_grid.functional.util import clear_grad
 
 from geometry_grid.torch_geometry.random import random_segments
 
 from geometry_grid.taichi_geometry.conversion import\
     check_conversion, converts_to, from_torch, struct_size, from_vec
-
-from taichi.math import vec3
 
 from geometry_grid.torch_geometry.typecheck import typechecked
 from tensorclass import TensorClass
@@ -20,16 +17,18 @@ from . import atomic
 @ti.func
 def _min_point_objects(point:ti.math.vec3, radius:ti.f32,
                         obj_struct:ti.template(), obj_arr:ti.template()):
-    index = atomic.unpack_index(-1, torch.inf)
+    index = atomic.pack_index(-1, torch.inf)
 
     for i in range(obj_arr.shape[0]):
       obj = from_vec(obj_struct, obj_arr[i])
       d = obj.point_distance(point)
       
       if d < radius:
-        atomic.atomic_min(index, d, i)
+        index2 = atomic.pack_index(i, d)
+        ti.atomic_min(index, index2)
 
     return atomic.unpack_index(index)
+
 
 def flat_type(obj_struct, objects):
   check_conversion(objects, obj_struct)
@@ -46,7 +45,7 @@ def min_distances_kernel(obj_struct):
     distances:ndarray(ti.f32), indices:ndarray(ti.i32)):
 
     for j in range(points.shape[0]):
-      distances[j], indices[j] = _min_point_objects(points[j], radius, obj_struct, obj_arr)
+      indices[j], distances[j] = _min_point_objects(points[j], radius, obj_struct, obj_arr)
 
   return k
 
@@ -83,36 +82,3 @@ def batch_distances(objects:TensorClass, points:torch.Tensor):
   return distances
 
 
-def batch_distances_grad(objects:TensorClass, points:torch.Tensor, distances:torch.Tensor, distances_grad:torch.Tensor):
-  assert objects.batch_shape[0] == points.shape[0]
-
-  k = batch_distances_kernel(converts_to(objects))
-  obj_vec = objects.to_vec()
-
-  if points.grad is None:
-    # points.grad = torch.zeros_like(points)
-    # obj_vec.grad = torch.zeros_like(obj_vec)
-
-    points.requires_grad_(True)
-    # obj_vec.requires_grad_(True)
-    distances.requires_grad_(True)
-
-  # print(distances.sum())
-  # k(obj_vec, points, distances)
-  # print(distances.sum())
-  # q = distances.sum().backward()
-
-  with clear_grad(obj_vec, points, distances):
-    distances.grad = distances_grad.contiguous()
-    
-    k.grad(obj_vec, points, distances)
-
-    if obj_vec.grad is not None:
-      obj_grad = objects.from_vec(obj_vec.grad)
-    else:
-      obj_grad = None
-    
-    print("????", points.grad.sum())
-    print(obj_vec.grad.sum())
-
-    return obj_grad, points.grad

@@ -32,9 +32,9 @@ def around_tubes(tubes:torch_geom.Tube, n:int, point_std:float = 0.01):
 
   
 @typechecked
-def around_segments(segments:torch_geom.Segment, n:int, radius:float, point_var:float = 0.01):
+def around_segments(segments:torch_geom.Segment, n:int, radius:float, point_std:float = 0.01):
   tubes = torch_geom.Tube(segments, torch.full((*segments.batch_shape, 2), radius, device=segments.device))
-  return around_tubes(tubes, n, point_var=point_var)
+  return around_tubes(tubes, n, point_std=point_std)
 
 def random_segments(bounds:torch_geom.AABox,
   length_range:Tuple[float, float]=(0.5, 2.0), n:int=100):

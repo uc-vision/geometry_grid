@@ -34,7 +34,7 @@ class PointQuery:
 
 
 @ti.kernel
-def _point_query(object_grid:ti.template(), 
+def _point_query(grid_index:ti.template(), 
     points:ndarray(vec3, ndim=1), 
     max_distance:ti.f32,
     distances:ndarray(ti.f32, ndim=1), 
@@ -44,20 +44,20 @@ def _point_query(object_grid:ti.template(),
   for i in range(points.shape[0]):
     q = PointQuery(points[i], max_distance, 
                    distance=torch.inf, index=-1, allow_zero=allow_zero)
-    object_grid._query_grid(q)
+    grid_index._query_grid(q)
 
     distances[i] = q.distance
     indexes[i] = q.index
 
 
-def point_query (object_grid, points:torch.Tensor, max_distance:float,
+def point_query (grid, points:torch.Tensor, max_distance:float,
                  allow_zero:bool=False) -> Tuple[torch.FloatTensor, torch.IntTensor]:
 
   distances = torch.empty((points.shape[0],), 
                           device=points.device, dtype=torch.float32)
   indexes = torch.empty_like(distances, dtype=torch.int32)
 
-  _point_query(object_grid, points, max_distance, distances, indexes, allow_zero)
+  _point_query(grid.index, points, max_distance, distances, indexes, allow_zero)
   return distances, indexes
 
 

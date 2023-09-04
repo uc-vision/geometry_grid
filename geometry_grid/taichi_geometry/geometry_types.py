@@ -8,6 +8,11 @@ import taichi.math as tm
 import numpy as np
 import geometry_grid.torch_geometry as ng
 
+vec5 = ti.types.vector(5, ti.f32)
+vec6 = ti.types.vector(6, ti.f32)
+vec7 = ti.types.vector(7, ti.f32)
+vec8 = ti.types.vector(8, ti.f32)
+
 @ti.dataclass
 class Sphere:
     center: vec3
@@ -17,6 +22,10 @@ class Sphere:
     def from_vec(self, vec:tm.vec4):
       self.center = vec3(vec.x, vec.y, vec.z)
       self.radius = vec.w
+
+    @ti.func
+    def to_vec(self):
+      return tm.vec4(*self.center, self.radius)
 
     @ti.func
     def area(self):
@@ -46,6 +55,10 @@ class Point:
       self.p = vec
 
     @ti.func
+    def to_vec(self):
+      return self.p
+
+    @ti.func
     def intersects_box(self, box:ti.template()):
       return box.contains(self.p)
 
@@ -72,10 +85,13 @@ class AABox:
   upper: vec3
 
   @ti.func
-  def from_vec(self, vec:ti.types.vector(6, ti.f32)):
+  def from_vec(self, vec:vec6):
     self.lower = vec[0:3]
     self.upper = vec[3:6]
 
+  @ti.func
+  def to_vec(self):
+    return vec6(*self.lower, *self.upper)
 
   @ti.func
   def expand(self, d:ti.f32):
@@ -136,9 +152,14 @@ class Plane:
   d: ti.f32
 
   @ti.func
-  def from_vec(self, v:ti.types.vector(4, ti.f32)):
+  def from_vec(self, v:tm.vec4):
     self.normal = v[:3]
     self.d = v[3]
+
+  @ti.func
+  def to_vec(self):
+    return tm.vec4(*self.normal, self.d)
+  
 
   @ti.func
   def point_distance(self, p:vec3):
@@ -164,6 +185,11 @@ class Segment:
   def from_vec(self, v:ti.types.vector(6, ti.f32)):
     self.a = v[:3]
     self.b = v[3:]
+
+  @ti.func
+  def to_vec(self):
+    return vec6(*self.a, *self.b)
+  
     
   @ti.func
   def dir(self) -> vec3:
@@ -264,11 +290,15 @@ class Line:
   p: vec3
   dir: vec3
 
-
+  
   @ti.func
   def from_vec(self, vec:ti.types.vector(6, ti.f32)):
     self.p = vec[:3]
     self.dir = vec[3:]
+
+  @ti.func
+  def to_vec(self):
+    return vec6(*self.p, *self.dir)
 
   @ti.func
   def line_closest(line1, line2:ti.template(), eps=1e-8) -> vec2:    
@@ -310,6 +340,10 @@ class Tube:
   def from_vec(self, vec:ti.types.vector(8, ti.f32)):
     self.segment.from_vec(vec[:6])
     self.radii = vec[6:]
+
+  @ti.func
+  def to_vec(self):
+    return vec8(*self.segment.to_vec(), *self.radii)
 
   @ti.func
   def radius_at(self, t:ti.f32):
