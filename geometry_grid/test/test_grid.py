@@ -16,7 +16,7 @@ def test_distances(grid, segs, points, radius):
     dist1, idx1 = tg.point_query.point_query(grid, points, max_distance=radius * 2)
     dist2, idx2 = min_distances(segs, points, max_distance=radius * 2)
 
-    assert torch.sum(idx1 >= 0) == torch.sum(idx2 >= 0)
+    assert (idx1 == idx2).all()
     assert torch.allclose(dist1, dist2)
 
     valid = idx1[idx1 >= 0].long()
@@ -24,15 +24,30 @@ def test_distances(grid, segs, points, radius):
 
     assert torch.allclose(dist1[idx1 >= 0], dist3)
 
-
     points.requires_grad_(True)
     dist4, idx4 = torch_func.point_query.point_query(grid, points, max_distance=radius * 2)
     assert torch.allclose(dist1, dist4)
+    assert (idx4 == idx1).all()
+
     
     loss = dist4.sum()
     loss.backward()
 
     grad4 = points.grad.clone()
+    points.grad.zero_()
+
+    dist5 = torch_func.distance.batch_distances(segs[idx4], points)
+    
+    loss = dist5.sum()
+    loss.backward()
+
+    grad5 = points.grad.clone()
+    assert torch.allclose(dist1, dist5)
+
+    print(grad4, grad5)
+    assert torch.allclose(grad4, grad5)
+
+
 
     
 

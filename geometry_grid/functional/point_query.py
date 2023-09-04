@@ -18,10 +18,7 @@ def point_query_func(grid, max_distance, allow_zero=False):
     @staticmethod
     def forward(ctx, points:torch.Tensor):
         distances, indexes = pq.point_query(grid, points, max_distance=max_distance, allow_zero=allow_zero)
-
         ctx.save_for_backward(points, distances)        
-        ctx.indexes = indexes
-
         return distances, indexes
 
     @staticmethod
