@@ -8,7 +8,7 @@ from tensorclass import TensorClass
 from beartype import beartype
 
 import torch
-from .conversion import converts_to, tensorclass_field
+from .conversion import converts_from, converts_to, struct_size, tensorclass_field
 
 from .dynamic_grid import block_bitmask, GridIndex
 
@@ -41,7 +41,7 @@ class CountedGrid:
 
     self._compute_prefixes()
 
-    self.index = ti.field(ti.i32, self.total_entries)
+    self.obj_index = ti.field(ti.i32, self.total_entries)
     self._fill_index()
 
     self.device = device
@@ -90,7 +90,7 @@ class CountedGrid:
         if self.objects[l].intersects_box(box):
           # Increment pointer and add object to the index
           index_loc = ti.atomic_add(self.current_index[cell], 1)
-          self.index[index_loc] = l
+          self.obj_index[index_loc] = l
 
     
 
@@ -116,6 +116,8 @@ class CountedGrid:
 
     return ti.math.ivec2(total_cells, total_entries)
 
+
+
   @property
   def index(self):
     return self
@@ -126,7 +128,7 @@ class CountedGrid:
     index, count = self.prefix[cell], self.counts[cell]
 
     for l in range(count):
-      idx = self.index[index + l]
+      idx = self.obj_index[index + l]
       query.update(idx, self.objects[idx])
 
 

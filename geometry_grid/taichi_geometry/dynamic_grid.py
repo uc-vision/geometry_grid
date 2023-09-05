@@ -132,28 +132,6 @@ class DynamicGrid:
     return ti.math.ivec2(total_cells, total_entries)
   
 
-  @ti.kernel
-  def _get_objects(self, indexes:ti.types.ndarray(ti.i32, ndim=1), obj_vecs:ti.types.ndarray(ndim=2)):
-    for i in range(indexes.shape[0]):
-      if indexes[i] >= 0:
-        v = self.objects[indexes[i]].to_vec()
-        for j in range(len(v)):
-          obj_vecs[i, j] = v[j]
-
-
-  def get_object_vecs(self, indexes:torch.Tensor):
-    obj_vecs = torch.empty((indexes.shape[0], struct_size(self.object_types)), 
-      device=self.device, dtype=torch.float32)
-
-    self._get_objects(indexes, obj_vecs)
-    return obj_vecs
-  
-  def get_objects(self, indexes:torch.Tensor):
-    obj_vecs = self.get_object_vecs(indexes)
-    tensorclass = converts_from(self.object_types)
-    return tensorclass.from_vec(obj_vecs)
-  
-
 
 
   @ti.kernel

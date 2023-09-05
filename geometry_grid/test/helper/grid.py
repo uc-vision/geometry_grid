@@ -30,7 +30,7 @@ def test_with(f,
   obj_grid = DynamicGrid.from_torch(grid, segs, max_occupied=64)
 
   for i in range(1000):
-    n_points = int(torch.randint(10, 100, ()).item())
+    n_points = int(torch.randint(10, 10000, ()).item())
 
     points = around_segments(segs, n_points, radius, point_std=noise_std)
     f(obj_grid, segs, points, radius)
@@ -41,7 +41,7 @@ def test_grid_with(f, seed=0):
   torch.manual_seed(seed)
   grid_size = tuple(torch.randint(4, 32, (3,)).tolist())
 
-  n = int(torch.randint(10, 100, ()).item())
+  n = int(torch.randint(10, 1000, ()).item())
   seg_length = (torch.rand(()) * 5.0 + 0.1).item()
 
   radius = (torch.rand(()) * 1.0 + 0.1).item()
