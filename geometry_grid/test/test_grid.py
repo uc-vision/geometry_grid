@@ -4,6 +4,7 @@ import torch
 import taichi as ti
 
 from geometry_grid.taichi_geometry.point_distances import min_distances, batch_distances
+from geometry_grid.taichi_geometry.query_grid import get_object_vecs
 
 
 from geometry_grid.test.helper.grid import test_grid_with
@@ -37,7 +38,7 @@ def test_distances(grid, segs, points, radius):
     grad4 = points.grad.clone()
     points.grad.zero_()
 
-    assert torch.allclose(segs[valid_segs].to_vec(), grid.get_object_vecs(valid_segs.to(torch.int32)))    
+    assert torch.allclose(segs[valid_segs].to_vec(), get_object_vecs(grid, valid_segs.to(torch.int32)))    
     dist5 = torch_func.distance.batch_distances(segs[valid_segs], points[valid_points])
     
     loss5 = dist5.sum()

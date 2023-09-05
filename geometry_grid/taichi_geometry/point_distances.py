@@ -60,7 +60,7 @@ def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=t
   return distances, indexes
 
 @cache
-def batch_distances_kernel(obj_struct):
+def batch_distances_kernel(obj_struct, distance_func):
   size = struct_size(obj_struct)
 
   @ti.kernel
@@ -68,17 +68,21 @@ def batch_distances_kernel(obj_struct):
     points:ndarray(ti.math.vec3), distances:ndarray(ti.f32)):
     for i in range(points.shape[0]):
       obj = from_vec(obj_struct, objects[i])
-      distances[i] = obj.point_distance(points[i])
+      distances[i] = distance_func(obj, points[i])
   
   return k
 
 
-def batch_distances(objects:TensorClass, points:torch.Tensor):
+def batch_distances(objects:TensorClass, points:torch.Tensor, distance_func=None):
   assert objects.batch_shape[0] == points.shape[0]
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
+  obj_struct = converts_to(objects)
 
-  k = batch_distances_kernel(converts_to(objects))
-  k(objects.to_vec(), points, distances)
+  k = batch_distances_kernel(obj_struct,
+      distance_func = distance_func or obj_struct.methods['point_distance'])
+
+
+  k(objects.to_vec(), points, distances, distance_func=None)
   return distances
 
 

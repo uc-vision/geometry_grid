@@ -1,4 +1,6 @@
+from functools import cache
 from typing import Tuple
+
 import taichi as ti
 from taichi.math import vec3
 from taichi.types import ndarray
@@ -6,44 +8,49 @@ import torch
 
 from .geometry_types import AABox
 
+@cache
+def _make_query(distance_func, allow_zero=False):
 
-@ti.dataclass
-class PointQuery:
-  point: vec3
-  max_distance: ti.f32
+  @ti.dataclass
+  class PointQuery:
+    point: vec3
+    max_distance: ti.f32
+    distance: ti.f32
+    index: ti.i32
 
-  distance: ti.f32
-  index: ti.i32
-  allow_zero: bool
+    @ti.func
+    def update(self, index, obj):
+      d = distance_func(obj, self.point)
+      if d < self.max_distance and ((d > 0.) or allow_zero):
+        old = ti.atomic_min(self.distance, d)
+        if old != self.distance:
+          self.index = index
+
+
+    @ti.func
+    def bounds(self) -> AABox:
+      lower = self.point - self.max_distance
+      upper = self.point + self.max_distance
+      return AABox(lower, upper)
 
   @ti.func
-  def update(self, index, obj):
-    d = obj.point_distance(self.point)
-    if d < self.max_distance and ((d > 0.) or self.allow_zero):
-      old = ti.atomic_min(self.distance, d)
-      if old != self.distance:
-        self.index = index
+  def f(point, max_distance):
+    return PointQuery(point, max_distance, torch.inf, -1)
 
-
-  @ti.func
-  def bounds(self) -> AABox:
-    lower = self.point - self.max_distance
-    upper = self.point + self.max_distance
-    return AABox(lower, upper)
-
+  return f
 
 
 @ti.kernel
 def _point_query(grid_index:ti.template(), 
     points:ndarray(vec3, ndim=1), 
+    make_query:ti.template(),
+
     max_distance:ti.f32,
     distances:ndarray(ti.f32, ndim=1), 
-    indexes:ndarray(ti.i32, ndim=1),
-    allow_zero:bool):
+    indexes:ndarray(ti.i32, ndim=1)):
   
   for i in range(points.shape[0]):
-    q = PointQuery(points[i], max_distance, 
-                   distance=torch.inf, index=-1, allow_zero=allow_zero)
+    q = make_query(points[i], max_distance)
     grid_index._query_grid(q)
 
     distances[i] = q.distance
@@ -51,13 +58,18 @@ def _point_query(grid_index:ti.template(),
 
 
 def point_query (grid, points:torch.Tensor, max_distance:float,
-                 allow_zero:bool=False) -> Tuple[torch.FloatTensor, torch.IntTensor]:
+                 allow_zero:bool=False, distance_func=None,
+                 ) -> Tuple[torch.FloatTensor, torch.IntTensor]:
 
   distances = torch.empty((points.shape[0],), 
                           device=points.device, dtype=torch.float32)
   indexes = torch.empty_like(distances, dtype=torch.int32)
 
-  _point_query(grid.index, points, max_distance, distances, indexes, allow_zero)
+  make_query = _make_query(
+    distance_func=distance_func or grid.object_type.methods['point_distance'],
+    allow_zero=allow_zero)
+
+  _point_query(grid.index, points, make_query, max_distance, distances, indexes)
   return distances, indexes
 
 
