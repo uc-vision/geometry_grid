@@ -62,7 +62,8 @@ class GridIndex:
 
 @ti.data_oriented
 class DynamicGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, object_types:ti.lang.Struct, max_occupied=64, 
+  def __init__(self, grid:Grid, objects:ti.Field, 
+        object_types:ti.lang.struct.StructType, max_occupied=64, 
     grid_chunk=8, device='cuda:0'):
 
     self.device = device

@@ -17,7 +17,7 @@ from . import atomic
 
 
 @ti.func
-def _min_point_objects(point:ti.math.vec3, radius:ti.f32,
+def _min_point_objects(point:ti.math.vec3,
                         obj_struct:ti.template(), obj_arr:ti.template()):
     index = atomic.pack_index(-1, torch.inf)
 
@@ -25,9 +25,8 @@ def _min_point_objects(point:ti.math.vec3, radius:ti.f32,
       obj = from_vec(obj_struct, obj_arr[i])
       d = obj.point_distance(point)
       
-      if d < radius:
-        index2 = atomic.pack_index(i, d)
-        ti.atomic_min(index, index2)
+      index2 = atomic.pack_index(i, d)
+      ti.atomic_min(index, index2)
 
     return atomic.unpack_index(index)
 
@@ -52,13 +51,13 @@ def min_distances_kernel(obj_struct):
   return k
 
 @typechecked
-def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=torch.inf):
+def min_distances(objects:TensorClass, points:torch.Tensor):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   indexes = torch.full_like(distances, -1, dtype=torch.int32)
 
   k = min_distances_kernel(converts_to(objects))
 
-  k(objects.to_vec(), points, max_distance, distances, indexes)
+  k(objects.to_vec(), points, distances, indexes)
   return distances, indexes
 
 @cache

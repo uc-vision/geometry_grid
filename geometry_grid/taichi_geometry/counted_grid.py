@@ -18,7 +18,9 @@ from .dynamic_grid import block_bitmask, GridIndex
 
 @ti.data_oriented
 class CountedGrid:
-  def __init__(self, grid:Grid, objects:ti.Field, object_types:ti.lang.Struct, grid_chunk=8, device='cuda:0'):
+  def __init__(self, grid:Grid, objects:ti.Field, 
+        object_types:ti.lang.struct.StructType, grid_chunk=8, device='cuda:0'):
+    
     self.grid = grid
     self.objects = objects
     self.object_types = object_types

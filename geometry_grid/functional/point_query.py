@@ -13,12 +13,14 @@ from functools import cache
 
 @cache
 def point_query_func(grid, allow_zero=False, distance_func=None):
-  kernel = batch_distances_kernel(grid.object_types, distance_func=distance_func)
+
+  kernel = batch_distances_kernel(grid.object_types, 
+    distance_func = distance_func or grid.object_types.methods['point_distance'])
   
   class BatchDistances(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, points:torch.Tensor, max_distance:float):
-        distances, indexes = pq.point_query(grid, points, max_distance=max_distance, allow_zero=allow_zero, distance_func=distance_func)
+    def forward(ctx, points:torch.Tensor):
+        distances, indexes = pq.point_query(grid, points, allow_zero=allow_zero, distance_func=distance_func)
         ctx.save_for_backward(points, distances, indexes)       
 
         return distances, indexes
@@ -38,6 +40,6 @@ def point_query_func(grid, allow_zero=False, distance_func=None):
   return BatchDistances.apply
 
 
-def point_query(grid, points, max_distance, allow_zero=False, distance_func=None):
+def point_query(grid, points, query_radius, allow_zero=False, distance_func=None):
   f = point_query_func(grid, allow_zero=allow_zero, distance_func=distance_func)
-  return f(points, max_distance)
+  return f(points, query_radius)

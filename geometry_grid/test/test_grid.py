@@ -14,8 +14,8 @@ import geometry_grid.taichi_geometry as tg
 
 
 def test_distances(grid, segs, points, radius):
-    dist1, idx1 = tg.point_query.point_query(grid, points, max_distance=radius * 2)
-    dist2, idx2 = min_distances(segs, points, max_distance=radius * 2)
+    dist1, idx1 = tg.point_query.point_query(grid, points, query_radius=radius * 2)
+    dist2, idx2 = min_distances(segs, points)
 
     assert torch.allclose(dist1, dist2)
     # assert (idx1 == idx2).all()
@@ -28,7 +28,7 @@ def test_distances(grid, segs, points, radius):
     assert torch.allclose(dist1[idx1 >= 0], dist3)
 
     points.requires_grad_(True)
-    dist4, idx4 = torch_func.point_query.point_query(grid, points, max_distance=radius * 2)
+    dist4, idx4 = torch_func.point_query.point_query(grid, points, query_radius=radius * 2)
     assert torch.allclose(dist1, dist4)
     # assert (idx4 == idx1).all()
 

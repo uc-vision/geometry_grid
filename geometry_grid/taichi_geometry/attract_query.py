@@ -11,7 +11,7 @@ from .geometry_types import AABox
 class AttractQuery:
   point: vec3
   sigma: ti.f32
-  max_distance: ti.f32
+  query_radius: ti.f32
 
   force: vec3
 
@@ -19,7 +19,7 @@ class AttractQuery:
   def update(self, _, obj):
     d, p = obj.nearest_point(self.point)
 
-    if d < self.max_distance and d > 1e-6:
+    if d < self.query_radius and d > 1e-6:
       v = p - self.point 
       l = ti.math.length(v)
       
@@ -31,19 +31,19 @@ class AttractQuery:
 
 @ti.kernel
 def _attract_query(object_grid:ti.template(), 
-    points:ndarray(vec3, ndim=1), attenuation:ti.f32, max_distance:ti.f32,
+    points:ndarray(vec3, ndim=1), attenuation:ti.f32, query_radius:ti.f32,
     forces:ndarray(vec3, ndim=1)):
   
   for i in range(points.shape[0]):
-    q = AttractQuery(points[i], attenuation, max_distance, vec3(0.))
-    bounds = AABox(points[i] - max_distance, points[i] + max_distance)
+    q = AttractQuery(points[i], attenuation, query_radius, vec3(0.))
+    bounds = AABox(points[i] - query_radius, points[i] + query_radius)
     object_grid._query_grid(q, bounds)
 
     forces[i] = q.force
 
 
 def attract_query (object_grid, points:torch.Tensor, 
-                   sigma:ti.f32, max_distance:float) -> torch.FloatTensor:
+                   sigma:ti.f32, query_radius:float) -> torch.FloatTensor:
   """ 
     Compute an attraction/repulsion force on each point due to the objects in the grid.
     force = exp(-(|v| / sigma)^2) * v / |v|
@@ -53,7 +53,7 @@ def attract_query (object_grid, points:torch.Tensor,
   forces = torch.zeros((points.shape[0], 3), 
                        device=points.device, dtype=torch.float32)
 
-  _attract_query(object_grid, points, sigma, max_distance, forces)
+  _attract_query(object_grid, points, sigma, query_radius, forces)
   return forces
 
 
