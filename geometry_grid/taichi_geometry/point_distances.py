@@ -1,4 +1,6 @@
 from functools import cache
+from typing import Callable
+from beartype import beartype
 import taichi as ti
 from taichi.types import ndarray
 import torch
@@ -60,7 +62,8 @@ def min_distances(objects:TensorClass, points:torch.Tensor, max_distance:float=t
   return distances, indexes
 
 @cache
-def batch_distances_kernel(obj_struct, distance_func):
+@beartype
+def batch_distances_kernel(obj_struct, distance_func:Callable):
   size = struct_size(obj_struct)
 
   @ti.kernel
@@ -78,11 +81,11 @@ def batch_distances(objects:TensorClass, points:torch.Tensor, distance_func=None
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   obj_struct = converts_to(objects)
 
-  k = batch_distances_kernel(obj_struct,
+  kernel = batch_distances_kernel(obj_struct,
       distance_func = distance_func or obj_struct.methods['point_distance'])
 
 
-  k(objects.to_vec(), points, distances, distance_func=None)
+  kernel(objects.to_vec(), points, distances)
   return distances
 
 

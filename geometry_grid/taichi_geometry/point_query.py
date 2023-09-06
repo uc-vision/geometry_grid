@@ -27,11 +27,6 @@ def _make_query(distance_func, allow_zero=False):
           self.index = index
 
 
-    @ti.func
-    def bounds(self) -> AABox:
-      lower = self.point - self.max_distance
-      upper = self.point + self.max_distance
-      return AABox(lower, upper)
 
   @ti.func
   def f(point, max_distance):
@@ -50,8 +45,11 @@ def _point_query(grid_index:ti.template(),
     indexes:ndarray(ti.i32, ndim=1)):
   
   for i in range(points.shape[0]):
+    bounds = AABox(points[i] - max_distance, points[i] + max_distance)
     q = make_query(points[i], max_distance)
-    grid_index._query_grid(q)
+
+
+    grid_index._query_grid(q, bounds)
 
     distances[i] = q.distance
     indexes[i] = q.index
@@ -65,8 +63,9 @@ def point_query (grid, points:torch.Tensor, max_distance:float,
                           device=points.device, dtype=torch.float32)
   indexes = torch.empty_like(distances, dtype=torch.int32)
 
+
   make_query = _make_query(
-    distance_func=distance_func or grid.object_type.methods['point_distance'],
+    distance_func=distance_func or grid.object_types.methods['point_distance'],
     allow_zero=allow_zero)
 
   _point_query(grid.index, points, make_query, max_distance, distances, indexes)

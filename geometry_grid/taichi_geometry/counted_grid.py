@@ -2,6 +2,7 @@ from typing import Tuple
 import taichi as ti
 from taichi.math import vec3, ivec3, ivec2
 from geometry_grid.taichi_geometry.field import placed_field
+from geometry_grid.taichi_geometry.geometry_types import AABox
 
 from geometry_grid.taichi_geometry.grid import Grid
 from tensorclass import TensorClass
@@ -133,8 +134,8 @@ class CountedGrid:
 
 
   @ti.func
-  def _query_grid(self, query:ti.template()):
-    ranges = self.grid.grid_ranges(query.bounds())
+  def _query_grid(self, query:ti.template(), bounds:AABox):
+    ranges = self.grid.grid_ranges(bounds)
 
     for i in ti.grouped(ti.ndrange(*ranges)):
         self._query_cell(i, query)

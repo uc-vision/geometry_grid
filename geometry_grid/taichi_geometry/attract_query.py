@@ -27,12 +27,6 @@ class AttractQuery:
 
 
 
-  @ti.func
-  def bounds(self) -> AABox:
-    lower = self.point - self.max_distance
-    upper = self.point + self.max_distance
-    return AABox(lower, upper)
-
 
 
 @ti.kernel
@@ -42,7 +36,8 @@ def _attract_query(object_grid:ti.template(),
   
   for i in range(points.shape[0]):
     q = AttractQuery(points[i], attenuation, max_distance, vec3(0.))
-    object_grid._query_grid(q)
+    bounds = AABox(points[i] - max_distance, points[i] + max_distance)
+    object_grid._query_grid(q, bounds)
 
     forces[i] = q.force
 

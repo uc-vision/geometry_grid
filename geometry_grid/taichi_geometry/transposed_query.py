@@ -33,11 +33,6 @@ def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
         p = atomic.pack_index(self.index, d)
         ti.atomic_min(packed_dist[index], p)
         
-    @ti.func
-    def bounds(self) -> AABox:
-      b = self.obj.bounds() 
-      return AABox(b.lower - self.max_distance, 
-                   b.upper + self.max_distance)
 
   @ti.kernel
   def _query_points(objs:ndarray(obj_vec, ndim=1), 
@@ -52,7 +47,11 @@ def build_grid_points_query(point_grid, ti_struct:ti.lang.struct.StructType):
       obj = conversion.from_vec(ti_struct, objs[i])
 
       q = QueryPoints(obj=obj, index=i, max_distance=max_distance)
-      point_grid._query_grid(q)
+      b = obj.bounds() 
+      bounds = AABox(b.lower - max_distance, 
+                   b.upper + max_distance)
+
+      point_grid._query_grid(q, bounds)
 
     for i in range(packed_dist.shape[0]):
       indexes[i], distances[i] = atomic.unpack_index(packed_dist[i])
