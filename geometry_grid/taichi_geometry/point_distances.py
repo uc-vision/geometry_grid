@@ -62,7 +62,8 @@ def min_point_distances(objects:TensorClass, points:torch.Tensor):
 
 @cache
 def point_distance_obj(obj_struct, point:ti.math.vec3):
-  vec_type = ti.types.ndarray(dtype=ti.types.vector(n1, ti.f32), ndim=1)
+  vec_type = ti.types.ndarray(dtype=ti.types.vector(struct_size(obj_struct), ti.f32), ndim=1)
+
 @ti.func
 def point_distance_obj(obj:ti.template(), point:ti.math.vec3):
   
@@ -87,7 +88,7 @@ def batch_distances(distance_func, obj1:torch.Tensor, obj2:torch.Tensor):
   assert obj1.shape[0] == obj2.shape[0]
   distances = torch.full((obj1.shape[0],), torch.inf, device=obj1.device, dtype=torch.float32)
 
-  kernel = batch_distances_kernel(obj1.shape[1], obj2.shape[2], distance_func)
+  kernel = batch_distances_kernel(obj1.shape[1], obj2.shape[1], distance_func)
   kernel(obj1, obj2, distances)
   
   return distances
