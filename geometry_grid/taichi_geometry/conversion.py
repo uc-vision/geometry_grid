@@ -108,7 +108,7 @@ def struct_size(ti_struct:ti.lang.struct.StructType):
       size += struct_size(v)
     else:
       size += 1
-  return size
+  return int(size)
 
 
 

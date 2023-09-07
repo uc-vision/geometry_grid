@@ -14,7 +14,7 @@ from .geometry_types import AABox, Point
 
 
 @cache
-def make_query(n:int, distance_func):
+def min_query_kernel(n:int, distance_func):
   vec_type = ti.types.vector(n, ti.f32)
   
   @ti.dataclass
@@ -33,7 +33,7 @@ def make_query(n:int, distance_func):
 
 
   @ti.kernel
-  def query_kernel(grid_index:ti.template(), 
+  def kernel(grid_index:ti.template(), 
       points:ndarray(vec_type, ndim=1), 
 
       query_radius:ti.f32,
@@ -49,14 +49,10 @@ def make_query(n:int, distance_func):
       distances[i] = q.distance
       indexes[i] = q.index
 
+  return kernel
 
-  return query_kernel
 
 
-@ti.func 
-def point_distance(obj:ti.template(), point:ti.math.vec3, query_radius:ti.f32):
-  d = obj.point_distance(point)
-  return ti.select(d <= query_radius, d, torch.inf)
 
 
 def min_query (grid, points:torch.Tensor, query_radius:float, distance_func) -> Tuple[torch.FloatTensor, torch.IntTensor]:
@@ -65,12 +61,16 @@ def min_query (grid, points:torch.Tensor, query_radius:float, distance_func) -> 
                           device=points.device, dtype=torch.float32)
   indexes = torch.empty_like(distances, dtype=torch.int32)
 
-
-  query = make_query(points.shape[1], distance_func)
+  query = min_query_kernel(points.shape[1], distance_func)
   query(grid.index, points, query_radius, distances, indexes)
 
   return distances, indexes
 
+
+@ti.func 
+def point_distance(obj:ti.template(), point:ti.math.vec3, query_radius:ti.f32):
+  d = obj.point_distance(point)
+  return ti.select(d <= query_radius, d, torch.inf)
 
 def point_query (grid, points:torch.Tensor, query_radius:float) -> Tuple[torch.FloatTensor, torch.IntTensor]:
   return min_query(grid, points, query_radius, point_distance)

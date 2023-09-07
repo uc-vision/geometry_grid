@@ -1,10 +1,9 @@
 
 import torch
 
-from geometry_grid.taichi_geometry.point_distances import (
-  batch_distances_kernel)
+from geometry_grid.taichi_geometry.point_distances import point_distances_kernel
 
-import  geometry_grid.taichi_geometry.point_query as pq
+import  geometry_grid.taichi_geometry.min_query as mq
 from geometry_grid.taichi_geometry.query_grid import get_object_vecs
 from .util import clear_grad
 
@@ -14,13 +13,12 @@ from functools import cache
 @cache
 def point_query_func(grid, allow_zero=False, distance_func=None):
 
-  kernel = batch_distances_kernel(grid.object_types, 
-    distance_func = distance_func or grid.object_types.methods['point_distance'])
-  
+  kernel = point_distances_kernel(grid.object_types)
+                                  
   class BatchDistances(torch.autograd.Function):
     @staticmethod
     def forward(ctx, points:torch.Tensor):
-        distances, indexes = pq.point_query(grid, points, allow_zero=allow_zero, distance_func=distance_func)
+        distances, indexes = mq.point_query(grid, points, allow_zero=allow_zero, distance_func=distance_func)
         ctx.save_for_backward(points, distances, indexes)       
 
         return distances, indexes

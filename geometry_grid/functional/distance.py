@@ -3,7 +3,7 @@ import torch
 from geometry_grid.taichi_geometry.conversion import converts_to
 
 from geometry_grid.taichi_geometry.point_distances import (
-  batch_distances_kernel)
+  point_distances_kernel)
 from .util import clear_grad
 
 import taichi as ti
@@ -12,7 +12,7 @@ from tensorclass import TensorClass
 from functools import cache
 
 
-def batch_distances(objects:TensorClass, points:torch.Tensor):
+def batch_point_distances(objects:TensorClass, points:torch.Tensor):
   assert objects.batch_shape == points.shape[:1], f"batch size does not match: {objects.batch_shape} != {points.shape[:1]}"
 
   struct_type = converts_to(objects)
@@ -21,7 +21,8 @@ def batch_distances(objects:TensorClass, points:torch.Tensor):
 
 @cache
 def batch_distances_func(obj_struct):
-  kernel = batch_distances_kernel(obj_struct)
+  kernel = point_distances_kernel(obj_struct)
+  
   class BatchDistances(torch.autograd.Function):
     @staticmethod
     def forward(ctx, obj_vec:torch.Tensor, points:torch.Tensor):
@@ -58,7 +59,7 @@ if __name__ == "__main__":
   segs = segs.requires_grad_(True)
   points.requires_grad = True
 
-  distances = batch_distances(segs, points)
+  distances = batch_point_distances(segs, points)
 
   loss = distances.sum()
   loss.backward()

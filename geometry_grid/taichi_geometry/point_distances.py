@@ -61,13 +61,15 @@ def min_point_distances(objects:TensorClass, points:torch.Tensor):
   return distances, indexes
 
 @cache
-def point_distance_obj(obj_struct, point:ti.math.vec3):
-  vec_type = ti.types.ndarray(dtype=ti.types.vector(struct_size(obj_struct), ti.f32), ndim=1)
+def point_distance_obj(obj_struct):
+  vec_type = ti.types.vector(struct_size(obj_struct), ti.f32)
 
-@ti.func
-def point_distance_obj(obj:ti.template(), point:ti.math.vec3):
+  @ti.func
+  def point_distance_obj(obj:vec_type, point:ti.math.vec3):
+    obj = from_vec(obj_struct, obj)
+    return obj.point_distance(point)
   
-  return obj.point_distance(point)
+  return point_distance_obj
 
 @cache
 @beartype
@@ -100,8 +102,9 @@ def batch_point_distances(objects:TensorClass, points:torch.Tensor):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   obj_struct = converts_to(objects)
 
-  
-  kernel = batch_distances_kernel(point_distance_obj(obj_struct), struct_size(obj_struct), 3)
-
+  kernel = point_distances_kernel(obj_struct)
   kernel(objects.to_vec(), points, distances)
   return distances
+
+def point_distances_kernel(obj_struct):
+    return batch_distances_kernel(point_distance_obj(obj_struct), struct_size(obj_struct), 3)
