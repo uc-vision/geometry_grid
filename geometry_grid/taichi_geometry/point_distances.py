@@ -51,7 +51,7 @@ def min_distances_kernel(obj_struct):
   return k
 
 @typechecked
-def min_distances(objects:TensorClass, points:torch.Tensor):
+def min_point_distances(objects:TensorClass, points:torch.Tensor):
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   indexes = torch.full_like(distances, -1, dtype=torch.int32)
 
@@ -61,30 +61,46 @@ def min_distances(objects:TensorClass, points:torch.Tensor):
   return distances, indexes
 
 @cache
+def point_distance_obj(obj_struct, point:ti.math.vec3):
+  vec_type = ti.types.ndarray(dtype=ti.types.vector(n1, ti.f32), ndim=1)
+@ti.func
+def point_distance_obj(obj:ti.template(), point:ti.math.vec3):
+  
+  return obj.point_distance(point)
+
+@cache
 @beartype
-def batch_distances_kernel(obj_struct, distance_func:Callable):
-  size = struct_size(obj_struct)
+def batch_distances_kernel(distance_func:Callable, n1:int, n2:int):
 
   @ti.kernel
-  def k(objects:ti.types.ndarray(dtype=ti.types.vector(size, ti.f32), ndim=1),
-    points:ndarray(ti.math.vec3), distances:ndarray(ti.f32)):
-    for i in range(points.shape[0]):
-      obj = from_vec(obj_struct, objects[i])
-      distances[i] = distance_func(obj, points[i])
+  def k(vec1:ti.types.ndarray(dtype=ti.types.vector(n1, ti.f32), ndim=1),
+        vec2:ti.types.ndarray(dtype=ti.types.vector(n2, ti.f32), ndim=1),
+    distances:ndarray(ti.f32)):
+
+    for i in range(vec1.shape[0]):
+      distances[i] = distance_func(vec1, vec2)
   
   return k
 
 
-def batch_distances(objects:TensorClass, points:torch.Tensor, distance_func=None):
+def batch_distances(distance_func, obj1:torch.Tensor, obj2:torch.Tensor):
+  assert obj1.shape[0] == obj2.shape[0]
+  distances = torch.full((obj1.shape[0],), torch.inf, device=obj1.device, dtype=torch.float32)
+
+  kernel = batch_distances_kernel(obj1.shape[1], obj2.shape[2], distance_func)
+  kernel(obj1, obj2, distances)
+  
+  return distances
+
+
+
+def batch_point_distances(objects:TensorClass, points:torch.Tensor):
   assert objects.batch_shape[0] == points.shape[0]
   distances = torch.full((points.shape[0],), torch.inf, device=points.device, dtype=torch.float32)
   obj_struct = converts_to(objects)
 
-  kernel = batch_distances_kernel(obj_struct,
-      distance_func = distance_func or obj_struct.methods['point_distance'])
-
+  
+  kernel = batch_distances_kernel(point_distance_obj(obj_struct), struct_size(obj_struct), 3)
 
   kernel(objects.to_vec(), points, distances)
   return distances
-
-

@@ -8,24 +8,25 @@ import torch
 
 from geometry_grid.taichi_geometry.conversion import from_vec, struct_size
 
-from .geometry_types import AABox
+from .geometry_types import AABox, Point
+
 
 
 
 @cache
-def make_query(obj_type):
-  vec_type = ti.types.vector(struct_size(obj_type), ti.f32)
-
+def make_query(n:int, distance_func):
+  vec_type = ti.types.vector(n, ti.f32)
+  
   @ti.dataclass
   class MinQuery:
-    item: vec_type
+    obj: vec_type
     query_radius: ti.f32
     distance: ti.f32
     index: ti.i32
 
     @ti.func
     def update(self, index, obj):
-      d = self.item.distance(obj, self.query_radius)
+      d = distance_func(obj, self.obj, self.query_radius)
       if d < self.distance:
         self.distance = d
         self.index = index
@@ -41,7 +42,7 @@ def make_query(obj_type):
     
     for i in range(points.shape[0]):
       bounds = AABox(points[i] - query_radius, points[i] + query_radius)
-      q = MinQuery(from_vec(obj_type, points[i]), query_radius, torch.inf, -1)
+      q = MinQuery(points[i], query_radius, torch.inf, -1)
 
       grid_index._query_grid(q, bounds)
 
@@ -52,19 +53,26 @@ def make_query(obj_type):
   return query_kernel
 
 
+@ti.func 
+def point_distance(obj:ti.template(), point:ti.math.vec3, query_radius:ti.f32):
+  d = obj.point_distance(point)
+  return ti.select(d <= query_radius, d, torch.inf)
 
-def min_query (grid, points:torch.Tensor, query_radius:float,
-                 obj_type:ti.lang.struct.StructType,
-                 ) -> Tuple[torch.FloatTensor, torch.IntTensor]:
+
+def min_query (grid, points:torch.Tensor, query_radius:float, distance_func) -> Tuple[torch.FloatTensor, torch.IntTensor]:
 
   distances = torch.empty((points.shape[0],), 
                           device=points.device, dtype=torch.float32)
   indexes = torch.empty_like(distances, dtype=torch.int32)
 
 
-  query = make_query(obj_type)
+  query = make_query(points.shape[1], distance_func)
   query(grid.index, points, query_radius, distances, indexes)
 
   return distances, indexes
+
+
+def point_query (grid, points:torch.Tensor, query_radius:float) -> Tuple[torch.FloatTensor, torch.IntTensor]:
+  return min_query(grid, points, query_radius, point_distance)
 
 
