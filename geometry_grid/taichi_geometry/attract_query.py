@@ -23,7 +23,7 @@ class AttractQuery:
       v = p - self.point 
       l = ti.math.length(v)
       
-      self.force += v * ti.exp(- (l / self.sigma)**2) / l
+      self.force += self.sigma * (v/l) * ti.exp(- (l / self.sigma)**2) 
 
 
 

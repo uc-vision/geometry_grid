@@ -94,7 +94,7 @@ class DynamicGrid:
 
   def update_objects(self, torch_objects:TensorClass):
 
-    check_conversion(torch_objects, self.objects)
+    check_conversion(torch_objects, self.object_types)
     if torch_objects.batch_shape == self.objects.shape:
       self.objects.from_torch(torch_objects.asdict())
     else:

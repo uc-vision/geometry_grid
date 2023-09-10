@@ -22,11 +22,13 @@ def batch_point_distances(objects:TensorClass, points:torch.Tensor):
 @cache
 def batch_distances_func(obj_struct):
   kernel = point_distances_kernel(obj_struct)
-  
+
   class BatchDistances(torch.autograd.Function):
     @staticmethod
     def forward(ctx, obj_vec:torch.Tensor, points:torch.Tensor):
         distances = torch.empty((points.shape[0],), dtype=torch.float32, device=points.device)
+
+
         kernel(obj_vec, points, distances)
         ctx.save_for_backward(points, distances, obj_vec)        
         return distances
