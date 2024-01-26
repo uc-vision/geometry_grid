@@ -63,8 +63,10 @@ class GridIndex:
 @ti.data_oriented
 class DynamicGrid:
   def __init__(self, grid:Grid, objects:ti.Field, 
-        object_types:ti.lang.struct.StructType, max_occupied=64, 
-    grid_chunk=8, device='cuda:0'):
+        object_types:ti.lang.struct.StructType, 
+        num_objects:int, 
+        max_occupied:int=64, 
+        grid_chunk:int=8, device='cuda:0'):
 
     self.device = device
     
@@ -76,9 +78,11 @@ class DynamicGrid:
     lists.place(self.occupied)
 
     self.grid = grid
-    self.objects = objects
-    self.object_types = object_types
 
+    self.objects = objects
+    self.num_objects = num_objects
+
+    self.object_types = object_types
     self.index = None
 
     self.add_objects()
@@ -88,17 +92,21 @@ class DynamicGrid:
     object_types = converts_to(torch_objects)
     objects = tensorclass_field(torch_objects, object_types)
 
-    return DynamicGrid(grid, objects, object_types,
+    return DynamicGrid(grid, objects, object_types, torch_objects.batch_shape[0],
       max_occupied=max_occupied, device=torch_objects.device, grid_chunk=grid_chunk)
 
+  @property
+  def capacity(self):
+    return self.objects.shape[0]
 
   def update_objects(self, torch_objects:TensorClass):
 
     check_conversion(torch_objects, self.object_types)
-    if torch_objects.batch_shape == self.objects.shape:
-      self.objects.from_torch(torch_objects.asdict())
-    else:
-      self.objects = tensorclass_field(torch_objects, self.objects.dtype)
+    if torch_objects.batch_shape[0] > self.capacity:
+      raise ValueError(f"Number of objects {torch_objects.batch_shape} exceeds capacity {self.capacity}, reallocate grid")
+
+    self.objects.from_torch(torch_objects.asdict())
+    self.num_objects = torch_objects.batch_shape[0]
 
     self.cells.parent().deactivate_all()
     self.add_objects()
@@ -106,15 +114,15 @@ class DynamicGrid:
 
   def add_objects(self):
     self.total_cells, self.total_entries = [
-      int(n) for n in self._add_objects(self.objects)]
+      int(n) for n in self._add_objects(self.objects, self.num_objects)]
 
     self.update_index()
 
 
   @ti.kernel
-  def _add_objects(self, objects:ti.template()) -> ti.math.ivec2:
+  def _add_objects(self, objects:ti.template(), num_objects:ti.i32) -> ti.math.ivec2:
     total_entries = 0
-    for l in range(objects.shape[0]):
+    for l in range(num_objects):
       obj = objects[l]
       ranges = self.grid.grid_ranges(obj.bounds())
       
